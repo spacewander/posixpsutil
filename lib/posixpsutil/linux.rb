@@ -1,4 +1,5 @@
 require 'ostruct'
+require_relative './common'
 
 module CPU
 
@@ -67,11 +68,19 @@ module CPU
     end
   end
 
-  def self.cpu_count()
-    count = -2 # except cpuidle and cpufreq
+  def self.cpu_count(logical=true)
+    count = 0
+    if !logical
+      IO.readlines('/proc/cpuinfo').each do |line|
+        count += 1 if line.start_with?('physical id')
+      end
+      return count
+    end
+
     Dir.entries('/sys/devices/system/cpu').each do |entry|
       count += 1 if entry.start_with?('cpu')
     end
+    count -= 2 # except cpuidle and cpufreq
     count
   end
 
@@ -171,19 +180,64 @@ module CPU
 
 end
 
-class Memory
+module Memory
 
   def self.virtual_memory()
-    
+    meminfo = OpenStruct.new
+    IO.readlines('/proc/meminfo').each do |line|
+      pair = line.split(':')
+      case pair[0]
+        when 'Cached'
+          # values are expressed in KB, we want bytes instead
+          meminfo.cached = pair[1].to_i * 1024
+        when 'Active'
+          meminfo.active = pair[1].to_i * 1024
+        when 'Inactive'
+          meminfo.inactive = pair[1].to_i * 1024
+        when 'Buffers'
+          meminfo.buffers = pair[1].to_i * 1024
+        when 'MemFree'
+          meminfo.free = pair[1].to_i * 1024
+        when 'MemTotal'
+          meminfo.total = pair[1].to_i * 1024
+      end
+    end
+
+    meminfo.used = meminfo.total - meminfo.free
+    meminfo.available = meminfo.free + meminfo.cached + meminfo.buffers
+    meminfo.percent = COMMON::usage_percent((
+      meminfo.total - meminfo.available) , meminfo.total, 1)
+    meminfo
   end
 
   def self.swap_memory()
+    meminfo = OpenStruct.new
+    swaps = File.new('/proc/swaps')
+    swaps.readline() # ignore column header
+    _, _, total, used, _ = swaps.readline().split(" ")
+    # values are expressed in 4 KB, we want bytes instead
+    meminfo.total = total.to_i * 1024
+    meminfo.used = used.to_i * 1024
+
     
+    meminfo.free = meminfo.total - meminfo.used
+    meminfo.percent = COMMON::usage_percent(meminfo.used, meminfo.total, 1)
+    
+    IO.readlines('/proc/vmstat').each do |line|
+      # values are expressed in 4 KB, we want bytes instead
+      if line.start_with?('pswpin')
+        meminfo.sin = line.split(' ')[1].to_i * 4 * 1024
+      elsif line.start_with?('pswpout')
+        meminfo.sout = line.split(' ')[1].to_i * 4 * 1024
+      end
+    end
+
+    meminfo
   end
 
 end
 
-class Disks
+module Disks
 
   def self.disk_parititions()
     
@@ -194,15 +248,15 @@ class Disks
    
 end
 
-class Network
+module Network
   
 end
 
-class System
+module System
    
 end
 
-class Processes
+module Processes
    
 end
 

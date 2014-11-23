@@ -5,6 +5,7 @@ require_relative '../lib/posixpsutil'
 
 def show_cpu()
   puts "The CPU number is #{CPU.cpu_count}"
+  puts "The physical CPU number is #{CPU.cpu_count(false)}"
   puts "Total CPU times: #{CPU.cpu_times}"
   puts "Each CPU times: #{CPU.cpu_times(true)}"
   sleep 1
