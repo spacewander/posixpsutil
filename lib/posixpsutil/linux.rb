@@ -240,12 +240,96 @@ end
 module Disks
 
   def self.disk_parititions()
-    
+    phydevs = []
+    # get physical filesystems
+    IO.readlines('/proc/filesystems').each do |line|
+      phydevs.push(line.strip()) unless line.start_with?('nodev')
+    end
+
+    ret = []
+    IO.readlines('/proc/self/mounts').each do |line|
+      line = line.split(' ')
+      # omit virtual filesystems
+      if line[2] in phydevs
+        partition = OpenStruct.new
+        partition.device = line[0]
+        partition.mountpoint = line[1]
+        partition.fstype = line[2]
+        partition.opts = line[3]
+      end
+      ret.push(partition)
+    end
+    ret
   end
 
   def self.disk_usage(path)
+
   end
    
+  def self.disk_io_counters(perdisk=true)
+    partition = []
+    lines = IO.readlines('/proc/partitions')[2..-1]
+    # get disks list
+    lines.each do |line|
+      name = line.split(' ')[3]
+      if name[-1] === /\d/
+        partitions.push(name)
+      elsif partitions.empty? || !partitions[-1].start_with?(name)
+        partitions.push(name)
+      end
+    end
+
+    ret = {}
+
+    # man iostat states that sectors are equivalent with blocks and
+    # have a size of 512 bytes since 2.4 kernels. This value is
+    # needed to calculate the amount of disk I/O in bytes.
+    SECTOR_SIZE = 512
+    # get disks stats
+    IO.readlines('/proc/diskstats') do |line|
+      fields = line.split()
+      if fields[2] in partitions
+        # go to http://www.mjmwired.net/kernel/Documentation/iostats.txt
+        # and see what these fields mean
+        if fields.length
+          _, _, name, reads, _, rbytes, rtime, writes, _, wbytes, wtime = fields[0..10]
+        else
+          # < kernel 2.6.25
+          _, _, name, reads, rbytes, writes, wbytes = fields
+          rtime, wtime = 0, 0
+        end
+
+        # fill with the data
+        disk = OpenStruct.new
+        disk.rbytes = rbytes.to_i * SECTOR_SIZE
+        disk.wbytes = wbytes.to_i * SECTOR_SIZE
+        disk.reads = reads.to_i
+        disk.writes = writes.to_i
+        disk.rtime = rtime.to_i
+        disk.wtime = wtime.to_i
+        ret[name] = disk
+      end # end if name in partitions
+    end # end read /proc/diskstats
+
+    # handle ret
+    if perdisk
+      return ret
+    else
+      total = OpenStruct.new(rbytes: 0, wbytes: 0, reads: 0, 
+                             writes: 0, rtime: 0, wtime: 0)
+      ret.each_value do |disk|
+        total.rbytes += disk.rbytes
+        total.wbytes += disk.wbytes
+        total.reads += disk.reads
+        total.writes += disk.writes
+        total.rtime += disk.rtime
+        total.wtime += disk.wtime
+      end
+
+      return total
+    end
+  end
+
 end
 
 module Network
