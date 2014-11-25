@@ -250,31 +250,55 @@ module Disks
     IO.readlines('/proc/self/mounts').each do |line|
       line = line.split(' ')
       # omit virtual filesystems
-      if line[2] in phydevs
+      if phydevs.include?(line[2])
         partition = OpenStruct.new
         partition.device = line[0]
         partition.mountpoint = line[1]
         partition.fstype = line[2]
         partition.opts = line[3]
+        ret.push(partition)
       end
-      ret.push(partition)
     end
     ret
   end
 
-  def self.disk_usage(path)
+  # WARNING: this method show the usage of a +disk+ instead of a given path!
+  def self.disk_usage(disk)
+    usage = OpenStruct.new
+    # FIXME use df to get disk usage. Once the c binding is finished, replace it.
+    IO.popen('df') do |f|
+      f.readlines[1..-1].each do |fs|
+        _, total, used, free, percent, mountpoint = fs.split(' ')
+        # with 1K blocks
+        if mountpoint == disk
+          usage.total = total.to_i * 1024
+          usage.used = used.to_i * 1024
+          usage.free = free.to_i * 1024
+          usage.percent = percent
+        end
+      end
+    end
 
+    throw ArgumentError.new('Given Argument is not a disk name') if usage.total.nil?
+    usage
   end
    
   def self.disk_io_counters(perdisk=true)
-    partition = []
-    lines = IO.readlines('/proc/partitions')[2..-1]
     # get disks list
-    lines.each do |line|
+    partitions = []
+    lines = IO.readlines('/proc/partitions')[2..-1]
+    # reverse lines so sda will be below sda1
+    lines.reverse.each do |line|
       name = line.split(' ')[3]
       if name[-1] === /\d/
+        # we're dealing with a partition (e.g. 'sda1'); 'sda' will
+        # also be around but we want to omit it
         partitions.push(name)
       elsif partitions.empty? || !partitions[-1].start_with?(name)
+        # we're dealing with a disk entity for which no
+        # partitions have been defined (e.g. 'sda' but
+        # 'sda1' was not around), see:
+        # https://github.com/giampaolo/psutil/issues/338
         partitions.push(name)
       end
     end
@@ -284,11 +308,11 @@ module Disks
     # man iostat states that sectors are equivalent with blocks and
     # have a size of 512 bytes since 2.4 kernels. This value is
     # needed to calculate the amount of disk I/O in bytes.
-    SECTOR_SIZE = 512
+    sector_size = 512
     # get disks stats
-    IO.readlines('/proc/diskstats') do |line|
+    IO.readlines('/proc/diskstats').each do |line|
       fields = line.split()
-      if fields[2] in partitions
+      if partitions.include?(fields[2])
         # go to http://www.mjmwired.net/kernel/Documentation/iostats.txt
         # and see what these fields mean
         if fields.length
@@ -301,12 +325,12 @@ module Disks
 
         # fill with the data
         disk = OpenStruct.new
-        disk.rbytes = rbytes.to_i * SECTOR_SIZE
-        disk.wbytes = wbytes.to_i * SECTOR_SIZE
-        disk.reads = reads.to_i
-        disk.writes = writes.to_i
-        disk.rtime = rtime.to_i
-        disk.wtime = wtime.to_i
+        disk.read_bytes = rbytes.to_i * sector_size
+        disk.write_bytes = wbytes.to_i * sector_size
+        disk.read_count = reads.to_i
+        disk.write_count = writes.to_i
+        disk.read_time = rtime.to_i
+        disk.write_time = wtime.to_i
         ret[name] = disk
       end # end if name in partitions
     end # end read /proc/diskstats
@@ -315,15 +339,15 @@ module Disks
     if perdisk
       return ret
     else
-      total = OpenStruct.new(rbytes: 0, wbytes: 0, reads: 0, 
-                             writes: 0, rtime: 0, wtime: 0)
+      total = OpenStruct.new(read_bytes: 0, write_bytes: 0, read_count: 0, 
+                             write_count: 0, read_time: 0, write_time: 0)
       ret.each_value do |disk|
-        total.rbytes += disk.rbytes
-        total.wbytes += disk.wbytes
-        total.reads += disk.reads
-        total.writes += disk.writes
-        total.rtime += disk.rtime
-        total.wtime += disk.wtime
+        total.read_bytes += disk.read_bytes
+        total.write_bytes += disk.write_bytes
+        total.read_count += disk.read_count
+        total.write_count += disk.write_count
+        total.read_time += disk.read_time
+        total.write_time += disk.write_time
       end
 
       return total
