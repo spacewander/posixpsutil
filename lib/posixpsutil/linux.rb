@@ -1,5 +1,6 @@
 require 'ostruct'
 require_relative './common'
+require_relative './helper'
 
 module CPU
 
@@ -205,7 +206,7 @@ module Memory
 
     meminfo.used = meminfo.total - meminfo.free
     meminfo.available = meminfo.free + meminfo.cached + meminfo.buffers
-    meminfo.percent = COMMON::usage_percent((
+    meminfo.percent = Common::usage_percent((
       meminfo.total - meminfo.available) , meminfo.total, 1)
     meminfo
   end
@@ -221,7 +222,7 @@ module Memory
 
     
     meminfo.free = meminfo.total - meminfo.used
-    meminfo.percent = COMMON::usage_percent(meminfo.used, meminfo.total, 1)
+    meminfo.percent = Common::usage_percent(meminfo.used, meminfo.total, 1)
     
     IO.readlines('/proc/vmstat').each do |line|
       # values are expressed in 4 KB, we want bytes instead
@@ -358,13 +359,143 @@ end
 
 module Network
   
+  include PsutilHelper
+
+  def self.net_io_counters(pernic=false)
+    lines = IO.readlines('/proc/net/dev')[2..-1]
+    if pernic
+      ret = {}
+      lines.each do |line|
+        colon = line.rindex(':')
+        name = line[0...colon].strip()
+        fields = line[(colon + 1)..-1].strip.split(' ')
+        counter = OpenStruct.new
+        counter.bytes_recv = fields[0].to_i
+        counter.packets_recv = fields[1].to_i
+        counter.errrin = fields[2].to_i
+        counter.dropin = fields[3].to_i
+        counter.bytes_sent = fields[8].to_i
+        counter.packets_sent = fields[9].to_i
+        counter.errout = fields[10].to_i
+        counter.dropout = fields[11].to_i
+        ret[name] = counter
+      end
+      ret
+    else
+      counter = OpenStruct.new(bytes_recv: 0, packets_recv: 0, 
+                               errin: 0, dropin: 0, bytes_sent: 0, 
+                               packets_sent: 0, errout: 0, dropout: 0)
+      lines.each do |line|
+        colon = line.rindex(':')
+        fields = line[(colon + 1)..-1].strip.split(' ')
+        counter.bytes_recv += fields[0].to_i
+        counter.packets_recv += fields[1].to_i
+        counter.errrin += fields[2].to_i
+        counter.dropin += fields[3].to_i
+        counter.bytes_sent += fields[8].to_i
+        counter.packets_sent += fields[9].to_i
+        counter.errout += fields[10].to_i
+        counter.dropout += fields[11].to_i
+      end
+      counter
+    end
+  end
+
+  def self.net_connections()
+  end
+
+  private_class_method :get_all_inodes
 end
 
 module System
-   
+  
+  def users()
+    
+  end
+
+  def boot_time()
+    
+  end
+
 end
 
 module Processes
    
 end
 
+# this module places all classes can be used both in Processes and in other modules
+module PsutilHelper
+
+  # A wrapper on top of /proc/net/* files, retrieving per-process
+  # and system-wide open connections (TCP, UDP, UNIX) similarly to
+  # "netstat -an".
+  # 
+  # Note: in case of UNIX sockets we're only able to determine the
+  # local endpoint/path, not the one it's connected to.
+  # According to [1] it would be possible but not easily.
+  #
+  # [1] http://serverfault.com/a/417946
+  class Connection
+    include NetworkConstance
+    def initialize()
+      # proc_filename, family, type
+      tcp4 = ["tcp", AF_INET, SOCK_STREAM]
+      tcp6 = ["tcp6", AF_INET6, SOCK_STREAM]
+      udp4 = ["udp", AF_INET, SOCK_DGRAM]
+      udp6 = ["udp6", AF_INET6, SOCK_DGRAM]
+      unix = ["unix", AF_UNIX, nil]
+      @tmap = {
+        all: [tcp4, tcp6, udp4, udp6, unix],
+        tcp: [tcp4, tcp6],
+        tcp4: [tcp4],
+        tcp6: [tcp6],
+        udp: [udp4, udp6],
+        udp4: [udp4],
+        udp6: [udp6],
+        unix: [unix],
+        inet: [tcp4, tcp6, udp4, udp6],
+        inet4: [tcp4, udp4],
+        inet6: [tcp6, udp6]
+      }
+    end
+
+    # parse /proc/net/tcp[46] and /proc/net/udp[46]
+    def process_inet(fn, family, type, filter_inodes=[])
+      f = File.new(fn)
+      f.readline()
+      ret = []
+      f.readlines.each do |line|
+        line = line.split(' ')
+        inode = line[9]
+        if filter_inodes.include?(inode)
+          inet_list = {inode: inode, laddr: decode_address(line[1]), 
+                       raddr: decode_address(line[2]), family: family, 
+                       type: type, status: CONN_NONE}
+          inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
+          ret.push(inet_list)
+        end # if inode included
+      end # each lines
+      ret
+    end
+
+    # parse /proc/net/unix 
+    def process_unix(fn, family, filter_inodes=[])
+      f = File.new(fn)
+      f.readline()
+      ret = []
+      f.readlines.each do |line|
+        line = line.split(' ')
+        inode = line[6]
+        if filter_inodes.include?(inode)
+          inet_list = {inode: inode, raddr: nil, family: family, 
+                       type: line[4].to_i, status: CONN_NONE, path: ''}
+          inet_list[:path] = line[-1] if line.size == 8
+          ret.push(inet_list)
+        end # if inode included
+      end # each lines
+      ret
+    end
+
+  end
+
+end
