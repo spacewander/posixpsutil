@@ -1,8 +1,7 @@
 require 'ostruct'
 require_relative './common'
-require_relative './helper'
 
-module CPU
+class CPU
 
   def self.cpu_times(precpu=false)
     proc_stat = File.new('/proc/stat')
@@ -181,7 +180,7 @@ module CPU
 
 end
 
-module Memory
+class Memory
 
   def self.virtual_memory()
     meminfo = OpenStruct.new
@@ -206,7 +205,7 @@ module Memory
 
     meminfo.used = meminfo.total - meminfo.free
     meminfo.available = meminfo.free + meminfo.cached + meminfo.buffers
-    meminfo.percent = Common::usage_percent((
+    meminfo.percent = COMMON::usage_percent((
       meminfo.total - meminfo.available) , meminfo.total, 1)
     meminfo
   end
@@ -222,7 +221,7 @@ module Memory
 
     
     meminfo.free = meminfo.total - meminfo.used
-    meminfo.percent = Common::usage_percent(meminfo.used, meminfo.total, 1)
+    meminfo.percent = COMMON::usage_percent(meminfo.used, meminfo.total, 1)
     
     IO.readlines('/proc/vmstat').each do |line|
       # values are expressed in 4 KB, we want bytes instead
@@ -238,7 +237,7 @@ module Memory
 
 end
 
-module Disks
+class Disks
 
   def self.disk_parititions()
     phydevs = []
@@ -357,10 +356,15 @@ module Disks
 
 end
 
-module Network
+class Network
   
   include PsutilHelper
+  include NetworkConstance
 
+  # get counters of network io (per network interface)
+  #
+  # when pernic is true, return a hash contains network io of each interface,
+  # otherwise return sum of all interface
   def self.net_io_counters(pernic=false)
     lines = IO.readlines('/proc/net/dev')[2..-1]
     if pernic
@@ -372,15 +376,15 @@ module Network
         counter = OpenStruct.new
         counter.bytes_recv = fields[0].to_i
         counter.packets_recv = fields[1].to_i
-        counter.errrin = fields[2].to_i
+        counter.errin = fields[2].to_i
         counter.dropin = fields[3].to_i
         counter.bytes_sent = fields[8].to_i
         counter.packets_sent = fields[9].to_i
         counter.errout = fields[10].to_i
         counter.dropout = fields[11].to_i
-        ret[name] = counter
+        ret[name.to_sym] = counter
       end
-      ret
+      return ret
     else
       counter = OpenStruct.new(bytes_recv: 0, packets_recv: 0, 
                                errin: 0, dropin: 0, bytes_sent: 0, 
@@ -390,24 +394,39 @@ module Network
         fields = line[(colon + 1)..-1].strip.split(' ')
         counter.bytes_recv += fields[0].to_i
         counter.packets_recv += fields[1].to_i
-        counter.errrin += fields[2].to_i
+        counter.errin += fields[2].to_i
         counter.dropin += fields[3].to_i
         counter.bytes_sent += fields[8].to_i
         counter.packets_sent += fields[9].to_i
         counter.errout += fields[10].to_i
         counter.dropout += fields[11].to_i
       end
-      counter
+      return counter
     end
   end
 
-  def self.net_connections()
+  # interface can be one of [:inet, :inet4, inet6, :udp, :udp4, :udp6,
+  # :tcp, :tcp4, :tcp6, :all, :unix]
+  #
+  # the default interface is :inet, contains udp[46] and tcp[46]
+  def self.net_connections(interface=:inet)
+    ret = []
+    connection = Connection.new
+    return nil unless connection.tmap.has_key?(interface)
+    connection.tmap[interface].each do |kind|
+      f, family, type = kind
+      if [AF_INET, AF_INET6].include?(family)
+        ret.push(connection.process_inet("/proc/net/#{f}", family, type))
+      else
+        ret.push(connection.process_unix("/proc/net/#{f}", family, type))
+      end
+    end
+    ret
   end
 
-  private_class_method :get_all_inodes
 end
 
-module System
+class System
   
   def users()
     
@@ -419,13 +438,12 @@ module System
 
 end
 
-module Processes
+class Processes
    
 end
 
 # this module places all classes can be used both in Processes and in other modules
 module PsutilHelper
-
   # A wrapper on top of /proc/net/* files, retrieving per-process
   # and system-wide open connections (TCP, UDP, UNIX) similarly to
   # "netstat -an".
@@ -437,6 +455,9 @@ module PsutilHelper
   # [1] http://serverfault.com/a/417946
   class Connection
     include NetworkConstance
+
+    attr_reader :tmap
+
     def initialize()
       # proc_filename, family, type
       tcp4 = ["tcp", AF_INET, SOCK_STREAM]
@@ -467,9 +488,9 @@ module PsutilHelper
       f.readlines.each do |line|
         line = line.split(' ')
         inode = line[9]
-        if filter_inodes.include?(inode)
-          inet_list = {inode: inode, laddr: decode_address(line[1]), 
-                       raddr: decode_address(line[2]), family: family, 
+        if filter_inodes.empty? || filter_inodes.include?(inode)
+          inet_list = {inode: inode, laddr: decode_address(line[1], family), 
+                       raddr: decode_address(line[2], family), family: family, 
                        type: type, status: CONN_NONE}
           inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
           ret.push(inet_list)
@@ -486,7 +507,7 @@ module PsutilHelper
       f.readlines.each do |line|
         line = line.split(' ')
         inode = line[6]
-        if filter_inodes.include?(inode)
+        if filter_inodes.empty? || filter_inodes.include?(inode)
           inet_list = {inode: inode, raddr: nil, family: family, 
                        type: line[4].to_i, status: CONN_NONE, path: ''}
           inet_list[:path] = line[-1] if line.size == 8
@@ -496,6 +517,11 @@ module PsutilHelper
       ret
     end
 
+    def decode_address(addr, family)
+      
+    end
+
   end
 
 end
+

@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # encoding: UTF-8
 
+require_relative '../lib/posixpsutil'
+
 puts "Net io counter for eth0 :"
 netios = Network.net_io_counters(true)
 netio = netios[:eth0]
@@ -26,12 +28,13 @@ puts "Dropout : #{netio.dropout()}"
 
 puts "\nNet connections : "
 Network.net_connections().each do |conn|
-  puts "Fd: #{conn.fd}"
+  p conn
+  #puts "Fd: #{conn.fd}"
   puts "Family: #{conn.family}"
   puts "Type: #{conn.type}"
   puts "Local address: #{conn.laddr}"
   puts "Remote address: #{conn.raddr}"
   puts "Status: #{conn.status}"
-  puts "Pid: #{conn.pid}\n"
+  #puts "Pid: #{conn.pid}\n"
 end
 

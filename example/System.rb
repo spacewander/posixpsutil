@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # encoding: UTF-8
 
+require_relative '../lib/posixpsutil'
+
 puts "Users detail :"
 puts "There are #{System.users.size} users"
 user = System.users[0]
