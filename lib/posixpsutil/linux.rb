@@ -1,4 +1,5 @@
 require 'ostruct'
+require 'ipaddr'
 require_relative './common'
 
 class CPU
@@ -247,6 +248,7 @@ class Disks
     end
 
     ret = []
+    # there will be some devices with /dev/disk/by-*, they are symbol links to physical devices
     IO.readlines('/proc/self/mounts').each do |line|
       line = line.split(' ')
       # omit virtual filesystems
@@ -416,9 +418,9 @@ class Network
     connection.tmap[interface].each do |kind|
       f, family, type = kind
       if [AF_INET, AF_INET6].include?(family)
-        ret.push(connection.process_inet("/proc/net/#{f}", family, type))
+        ret.concat(connection.process_inet("/proc/net/#{f}", family, type))
       else
-        ret.push(connection.process_unix("/proc/net/#{f}", family, type))
+        ret.concat(connection.process_unix("/proc/net/#{f}", family, type))
       end
     end
     ret
@@ -444,6 +446,53 @@ end
 
 # this module places all classes can be used both in Processes and in other modules
 module PsutilHelper
+
+  class Processes
+    # Returns a list of PIDs currently running on the system.
+    def self.pids()
+      Dir.entries('/proc').map(&:to_i).delete_if {|x| x == 0}
+    end
+
+    # be aware of Permission denied
+    def self.get_proc_inodes(pid)
+      inodes = {}
+      Dir.entries("/proc/#{pid}/fd").each do |fd|
+        # get actual path
+        begin
+          inode = File.readlink("/proc/#{pid}/fd/#{fd}")
+          # check if it is a socket
+          if inode.start_with? 'socket:['
+            inode = inode[8...-1]
+            inodes[inode] ||= []
+            inodes[inode].push([pid, fd.to_i]) 
+          end
+        rescue SystemCallError
+          next
+        end
+      end
+      inodes
+    end
+
+    # format:
+    # inodes= {
+    #   inode1 => [[pid, fd], [pid, fd], ...]
+    #   inode2...
+    #   }
+    def self.get_all_inodes()
+      inodes = {}
+      self.pids.each do |pid|
+        begin
+          inodes.merge!(self.get_proc_inodes(pid))
+        rescue SystemCallError => e
+          raise unless [Errno::ENOENT::Errno, Errno::ESRCH::Errno, 
+                        Errno::EPERM::Errno, Errno::EACCES::Errno].include?(e.errno)
+        end
+      end
+      inodes
+    end
+
+  end
+
   # A wrapper on top of /proc/net/* files, retrieving per-process
   # and system-wide open connections (TCP, UDP, UNIX) similarly to
   # "netstat -an".
@@ -493,6 +542,7 @@ module PsutilHelper
                        raddr: decode_address(line[2], family), family: family, 
                        type: type, status: CONN_NONE}
           inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
+          inet_list = OpenStruct.new inet_list
           ret.push(inet_list)
         end # if inode included
       end # each lines
@@ -511,14 +561,55 @@ module PsutilHelper
           inet_list = {inode: inode, raddr: nil, family: family, 
                        type: line[4].to_i, status: CONN_NONE, path: ''}
           inet_list[:path] = line[-1] if line.size == 8
+          inet_list = OpenStruct.new inet_list
           ret.push(inet_list)
         end # if inode included
       end # each lines
       ret
     end
 
+    # Accept an "ip:port" address as displayed in /proc/net/*
+    # and convert it into a human readable form, like:
+    # "0500000A:0016" -> ("10.0.0.5", 22)
+    # "0000000000000000FFFF00000100007F:9E49" -> ("::ffff:127.0.0.1", 40521)
+    # The IP address portion is a little or big endian four-byte
+    # hexadecimal number; that is, the least significant byte is listed
+    # first, so we need to reverse the order of the bytes to convert it
+    # to an IP address.
+    # The port is represented as a two-byte hexadecimal number.
+    # Reference:
+    # http://linuxdevcenter.com/pub/a/linux/2000/11/16/LinuxAdmin.html
     def decode_address(addr, family)
-      
+      ip, port = addr.split(':')
+      # this usually refers to a local socket in listen mode with
+      # no end-points connected
+      return nil if !port || port == '0000'
+      # convert /proc style ip and port 
+      # to addrinfo string according to family and endian
+      # little endian
+      if '\x00\x01'.unpack('S') == '\x00\x01'.unpack('S<') 
+        if family == AF_INET
+          # FIXME should refactor this part
+          ip.reverse!
+          bound = ip.size / 2 - 1
+          0.upto(bound) { |i| ip[2 * i], ip[2 * i + 1] = ip[2 * i + 1], ip[2 * i]}
+        else # AF_INET6
+          ip_parts = []
+          bound = ip.size / 8 - 1
+          0.upto(bound) do |i|
+            ip_parts.push(ip[8 * i..(8 * i + 7)])
+          end
+          ip_parts.each do |part| 
+            part.reverse!
+            bound = part.size / 2 - 1
+            0.upto(bound) { |i| part[2 * i], part[2 * i + 1] = part[2 * i + 1], part[2 * i]}
+          end
+          ip = ip_parts.join
+        end
+      end
+      port = port.to_i 16
+      ip = IPAddr.new(ip.to_i(16), family).to_s
+      [ip, port]
     end
 
   end
