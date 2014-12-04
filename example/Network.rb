@@ -29,7 +29,7 @@ puts "Dropout : #{netio.dropout()}"
 puts "\nNet connections : "
 Network.net_connections().each do |conn|
   print "Inode: #{conn.inode} "
-  print "Fd: #{conn.fd}"
+  print "Fd: #{conn.fd} "
   print "Family: #{conn.family} "
   print "Type: #{conn.type} "
   print "Local address: #{conn.laddr} "

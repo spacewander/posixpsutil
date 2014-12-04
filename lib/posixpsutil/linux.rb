@@ -425,10 +425,14 @@ class Network
       end
     end
     inodes = Processes.get_all_inodes
-    # remove those don't have relative pid/fd. Mostly because Permission denied
-    ret.delete_if {|conn| !(inodes.has_key? conn.inode) }
+    #  set pid to nil and fd to -1 for those inodes without relative pid/fd. 
+    #  Mostly because Permission denied
     ret.each do |conn|
-      conn.pid, conn.fd = inodes[conn.inode].first
+      if inodes.has_key? conn.inode
+        conn.pid, conn.fd = inodes[conn.inode].first
+      else
+        conn.pid, conn.fd = nil, -1
+      end
     end
     ret
   end
@@ -448,6 +452,7 @@ class System
       f.readlines.each do |login_info|
         name, tty, date, time, host = login_info.split(' ')
         host = host[1..-2]
+        host = 'localhost' if host == ':0'
         ts = DateTime.parse(date + " " + time).to_time.to_f
         # I do not like to convert date and time to timestamp
         # but this is what psutil does, so I have to follow it.
@@ -617,29 +622,15 @@ module PsutilHelper
       return nil if !port || port == '0000'
       # convert /proc style ip and port 
       # to addrinfo string according to family and endian
-      # little endian
-      if '\x00\x01'.unpack('S') == '\x00\x01'.unpack('S<') 
-        if family == AF_INET
-          # FIXME should refactor this part
-          ip.reverse!
-          bound = ip.size / 2 - 1
-          0.upto(bound) { |i| ip[2 * i], ip[2 * i + 1] = ip[2 * i + 1], ip[2 * i]}
-        else # AF_INET6
-          ip_parts = []
-          bound = ip.size / 8 - 1
-          0.upto(bound) do |i|
-            ip_parts.push(ip[8 * i..(8 * i + 7)])
-          end
-          ip_parts.each do |part| 
-            part.reverse!
-            bound = part.size / 2 - 1
-            0.upto(bound) { |i| part[2 * i], part[2 * i + 1] = part[2 * i + 1], part[2 * i]}
-          end
-          ip = ip_parts.join
-        end
+      if '\x00\x01'.unpack('S') == '\x00\x01'.unpack('S<') # little endian
+        # first going decoding the hexadecimal
+        # then converting to 32 bit integers in small endian
+        # encoding these integers with big endian
+        # encoding the result in hexadecimal
+        ip = [ip].pack('H*').unpack('N*').pack('V*').unpack('H*').first.hex
       end
       port = port.to_i 16
-      ip = IPAddr.new(ip.to_i(16), family).to_s
+      ip = IPAddr.new(ip, family).to_s
       [ip, port]
     end
 
