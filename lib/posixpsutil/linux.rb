@@ -437,12 +437,35 @@ end
 
 class System
   
-  def users()
-    
+  require 'date'
+
+  # store boot time since it won't be changed
+  @boot_at = nil
+  # use `who` to get userinfo. Also, replace it with system call if possible
+  def self.users()
+    users = []
+    IO.popen('who') do |f|
+      f.readlines.each do |login_info|
+        name, tty, date, time, host = login_info.split(' ')
+        host = host[1..-2]
+        ts = DateTime.parse(date + " " + time).to_time.to_f
+        # I do not like to convert date and time to timestamp
+        # but this is what psutil does, so I have to follow it.
+        users.push(OpenStruct.new({name: name, terminal: tty, 
+                                   host: host, started: ts}))
+      end
+    end
+    users
   end
 
-  def boot_time()
-    
+  # return system boot time expressed in seconds since epoch
+  def self.boot_time()
+    unless @boot_at
+      IO.readlines('/proc/stat').each do |line|
+        @boot_at = line.strip.split[1].to_f if line.start_with?('btime')
+      end
+    end
+    @boot_at
   end
 
 end
