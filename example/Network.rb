@@ -28,12 +28,13 @@ puts "Dropout : #{netio.dropout()}"
 
 puts "\nNet connections : "
 Network.net_connections().each do |conn|
-  #puts "Fd: #{conn.fd}"
+  print "Inode: #{conn.inode} "
+  print "Fd: #{conn.fd}"
   print "Family: #{conn.family} "
   print "Type: #{conn.type} "
   print "Local address: #{conn.laddr} "
   print "Remote address: #{conn.raddr} "
-  print "Status: #{conn.status}\n"
-  #puts "Pid: #{conn.pid}\n"
+  print "Status: #{conn.status} "
+  print "Pid: #{conn.pid}\n"
 end
 

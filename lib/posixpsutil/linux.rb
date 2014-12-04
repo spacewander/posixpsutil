@@ -411,6 +411,7 @@ class Network
   # :tcp, :tcp4, :tcp6, :all, :unix]
   #
   # the default interface is :inet, contains udp[46] and tcp[46]
+  # return #<OpenStruct inode, laddr, raddr, family, type, status, fd, pid>
   def self.net_connections(interface=:inet)
     ret = []
     connection = Connection.new
@@ -422,6 +423,12 @@ class Network
       else
         ret.concat(connection.process_unix("/proc/net/#{f}", family, type))
       end
+    end
+    inodes = Processes.get_all_inodes
+    # remove those don't have relative pid/fd. Mostly because Permission denied
+    ret.delete_if {|conn| !(inodes.has_key? conn.inode) }
+    ret.each do |conn|
+      conn.pid, conn.fd = inodes[conn.inode].first
     end
     ret
   end
@@ -462,7 +469,7 @@ module PsutilHelper
           inode = File.readlink("/proc/#{pid}/fd/#{fd}")
           # check if it is a socket
           if inode.start_with? 'socket:['
-            inode = inode[8...-1]
+            inode = inode[8...-1].to_i
             inodes[inode] ||= []
             inodes[inode].push([pid, fd.to_i]) 
           end
@@ -484,6 +491,7 @@ module PsutilHelper
         begin
           inodes.merge!(self.get_proc_inodes(pid))
         rescue SystemCallError => e
+          # Not Permission denied?
           raise unless [Errno::ENOENT::Errno, Errno::ESRCH::Errno, 
                         Errno::EPERM::Errno, Errno::EACCES::Errno].include?(e.errno)
         end
@@ -538,7 +546,7 @@ module PsutilHelper
         line = line.split(' ')
         inode = line[9]
         if filter_inodes.empty? || filter_inodes.include?(inode)
-          inet_list = {inode: inode, laddr: decode_address(line[1], family), 
+          inet_list = {inode: inode.to_i, laddr: decode_address(line[1], family), 
                        raddr: decode_address(line[2], family), family: family, 
                        type: type, status: CONN_NONE}
           inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
@@ -558,7 +566,7 @@ module PsutilHelper
         line = line.split(' ')
         inode = line[6]
         if filter_inodes.empty? || filter_inodes.include?(inode)
-          inet_list = {inode: inode, raddr: nil, family: family, 
+          inet_list = {inode: inode.to_i, raddr: nil, family: family, 
                        type: line[4].to_i, status: CONN_NONE, path: ''}
           inet_list[:path] = line[-1] if line.size == 8
           inet_list = OpenStruct.new inet_list
