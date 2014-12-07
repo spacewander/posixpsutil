@@ -4,6 +4,7 @@
 require 'rbconfig'
 
 os = RbConfig::CONFIG['host_os']
+require_relative 'posixpsutil/processes'
 case os
   when /darwin|mac os|solaris|bsd/
     require_relative 'posixpsutil/posix'
