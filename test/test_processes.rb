@@ -1,5 +1,5 @@
 require 'minitest/autorun'
-require_relative '../lib/posixpsutil/processes.rb'
+require 'posixpsutil/processes'
 
 class TestPsutilError < MiniTest::Test
    def test_access_denied

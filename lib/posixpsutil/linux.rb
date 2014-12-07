@@ -240,7 +240,7 @@ end
 
 class Disks
 
-  def self.disk_parititions()
+  def self.disk_partitions()
     phydevs = []
     # get physical filesystems
     IO.readlines('/proc/filesystems').each do |line|
