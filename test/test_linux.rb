@@ -106,3 +106,46 @@ class TestMemory < MiniTest::Test
    end
 
 end
+
+class TestSystem < MiniTest::Test
+
+  def test_bool_time
+    date, time = IO.popen('who -b').readline.split[1..2]
+    # the result of `who -b` accurates to the minute
+    assert_in_delta DateTime.parse(date + " " + time).to_time.to_f, 
+      System.boot_time, 60 * 1000
+  end
+   
+  def test_users
+    assert_respond_to System.users[0], :name
+    assert_respond_to System.users[0], :terminal
+    assert_respond_to System.users[0], :host
+    assert_respond_to System.users[0], :started
+  end
+end
+
+class TestNetwork < MiniTest::Test
+  def test_net_io_counters
+    netio = Network.net_io_counters(true)[:lo]
+    assert_respond_to netio, :bytes_sent
+    assert_respond_to netio, :bytes_recv
+    assert_respond_to netio, :packets_sent
+    assert_respond_to netio, :packets_recv
+    assert_respond_to netio, :errin
+    assert_respond_to netio, :errout
+    assert_respond_to netio, :dropin
+    assert_respond_to netio, :dropout
+  end
+
+  def test_net_connetions
+    conn = Network.net_connections[0]
+    assert_respond_to conn, :inode
+    assert_respond_to conn, :fd
+    assert_respond_to conn, :family
+    assert_respond_to conn, :type
+    assert_respond_to conn, :laddr
+    assert_respond_to conn, :raddr
+    assert_respond_to conn, :status
+    assert_respond_to conn, :pid
+  end
+end
