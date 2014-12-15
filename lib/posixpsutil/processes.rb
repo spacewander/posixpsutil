@@ -1,5 +1,6 @@
 require 'ostruct'
 require 'rbconfig'
+require_relative 'psutil_error'
 
 os = RbConfig::CONFIG['host_os']
 case os
@@ -9,51 +10,6 @@ case os
     require_relative 'linux_process'
   else
     raise RuntimeError, "unknown os: #{os.inspect}"
-end
-
-class PsutilError < StandardError
-  
-  def to_s
-    @message
-  end
-end
-
-class NoSuchProcess < PsutilError
-   
-  def initialize(opt={})
-    raise ArgumentError if opt[:pid].nil?
-    @pid = opt[:pid] # pid must given
-    @name = opt[:name] || nil
-    if opt[:msg].nil?
-      if @name
-        details = "(pid=#{@pid}, name=#{@name.to_s})"
-      else
-        details = "(pid=#{@pid})"
-      end
-      opt[:msg] = "process no longer exists " + details
-    end
-    @message = opt[:msg]
-  end
-
-end
-
-class AccessDenied < PsutilError
-  
-  def initialize(opt={})
-    @pid = opt[:pid] || nil
-    @name = opt[:name] || nil
-    if opt[:msg].nil?
-      if @pid && @name
-        details = "(pid=#{@pid}, name=#{@name.to_s})"
-      elsif @pid
-        details = "(pid=#{@pid})"
-      else
-        details = ""
-      end
-      opt[:msg] = "access is denied " + details
-    end
-    @message = opt[:msg]
-  end
 end
 
 # As there is a Process Module in ruby, I change the name to Processes
@@ -113,7 +69,7 @@ class Processes
       # limited user
     rescue NoSuchProcess
       msg = "no process found with pid #{@pid}"
-      raise NoSuchProcess(@pid, nil, msg)
+      raise NoSuchProcess(pid:@pid, msg:msg)
     end
     # This part is supposed to indentify a Process instance
     # univocally over time (the PID alone is not enough as
@@ -225,7 +181,7 @@ class Processes
           cmdline = []
         end
         if cmdline
-          extended_name = File.new(cmdline[0]).basename
+          extended_name = File.basename(cmdline[0])
           @name = extended_name if extended_name.start_with?(@name)
         end
       end

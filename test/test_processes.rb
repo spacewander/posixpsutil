@@ -56,4 +56,14 @@ class TestProcesses < MiniTest::Test
       @anonymous_process.inspect
   end
 
+  def test_name
+    # current process
+    assert_equal true, @anonymous_process.name().start_with?('ruby')
+  end
+
+  def test_cmdline
+    # should be run with `rake test`
+    assert_equal '-Ilib:lib:test', @anonymous_process.cmdline()[1]
+  end
+
 end
