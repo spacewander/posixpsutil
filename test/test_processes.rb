@@ -34,7 +34,8 @@ end
 class TestProcesses < MiniTest::Test
 
   def setup
-    @anonymous_process = Processes.new(18000)
+    # if pid not given, the pid should be Process.pid
+    @anonymous_process = Processes.new()
   end
 
   def test_eq
@@ -42,12 +43,17 @@ class TestProcesses < MiniTest::Test
   end
   
   def test_not_eq
-    refute_equal 18000, @anonymous_process
+    refute_equal Process.pid, @anonymous_process
   end
 
   def test_to_s
-    assert_equal "(pid=#{18000}, name=#{@anonymous_process.name()})", 
+    assert_equal "(pid=#{Process.pid}, name=#{@anonymous_process.name()})", 
       @anonymous_process.to_s
+  end
+
+  def test_inspect
+    assert_equal "(pid=#{Process.pid}, name=#{@anonymous_process.name()})".inspect, 
+      @anonymous_process.inspect
   end
 
 end

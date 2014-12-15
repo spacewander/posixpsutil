@@ -56,6 +56,7 @@ class AccessDenied < PsutilError
   end
 end
 
+# As there is a Process Module in ruby, I change the name to Processes
 class Processes
    # Represents an OS process with the given PID.
    # If PID is omitted current process PID (Process.pid) is used.
@@ -89,6 +90,7 @@ class Processes
    #     process identity for every instance
   
   attr_reader :identity
+  attr_reader :pid
 
   def initialize(pid=nil)
     pid = Process.pid unless pid
@@ -130,6 +132,10 @@ class Processes
     end
   end
 
+  def inspect
+    self.to_s.inspect
+  end
+
   def ==(other)
     # Test for equality with another Process object based
     # on PID and creation time.
@@ -141,8 +147,96 @@ class Processes
     return !(self == other)
   end
 
+  # utility methods
+  
+  # Utility method returning process information as a hash.
+  # Unlike normal to_hash method, this method can accept two params,
+  # attrs and default
+  #
+  # If 'attrs' is specified it must be a list of strings
+  # reflecting available Process class' attribute names
+  # (e.g. ['cpu_times', 'name']) else all public (read
+  # only) attributes are assumed.
+
+  # 'default' is the value which gets assigned in case
+  # AccessDenied  exception is raised when retrieving that
+  # particular process information.
+  def to_hash(attrs=[], default={})
+    included_name = []
+    ret = {}
+    attrs = included_name if attrs == []
+    attrs.each do |attr|
+      ret[attr] = nil
+      begin
+        ret[attr] = attr()
+      rescue AccessDenied
+        ret[attr] = default[attr] if default.has_key? attr
+      rescue NotImplementedError
+        raise if attrs
+        ret[attr] = default[attr] if default.has_key? attr
+      end
+    end
+    ret
+  end
+
+  # Return the parent process as a Processes object pre-emptively
+  # checking whether PID has been reused.
+  # If no parent is known return nil.
+  def parent
+    ppid = ppid()
+    if ppid 
+      begin
+        parent = Processes.new ppid
+        return parent if parent.create_time() <= create_time()
+      rescue NoSuchProcess
+        # ignore ...
+      end
+    end
+    return nil
+  end
+
+  # Return if this process is running.
+  # It also checks if PID has been reused by another process in
+  # which case return false.
+  def is_running
+    return false if @gone
+    begin
+      return self == Processes(@pid)
+    rescue NoSuchProcess
+      @gone = true
+      return false
+    end
+  end
+
+  # actual API
+  
+  def ppid
+    @proc.ppid
+  end
+
+  # The process name. The return value is cached after first call.
   def name
-    return ""
+    unless @name
+      @name = @proc.name()
+      if @name.length >= 15
+        begin
+          cmdline = cmdline()
+        rescue AccessDenied
+          cmdline = []
+        end
+        if cmdline
+          extended_name = File.new(cmdline[0]).basename
+          @name = extended_name if extended_name.start_with?(@name)
+        end
+      end
+    end
+    @name
+  end
+
+  # The command line this process has been called with.
+  # An array will be returned
+  def cmdline
+    @proc.cmdline()
   end
 
   def create_time

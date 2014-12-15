@@ -108,7 +108,6 @@ class TestMemory < MiniTest::Test
 end
 
 class TestSystem < MiniTest::Test
-
   def test_bool_time
     date, time = IO.popen('who -b').readline.split[1..2]
     # the result of `who -b` accurates to the minute
