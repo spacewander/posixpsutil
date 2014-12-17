@@ -35,35 +35,39 @@ class TestProcesses < MiniTest::Test
 
   def setup
     # if pid not given, the pid should be Process.pid
-    @anonymous_process = Processes.new()
+    @process = Processes.new()
   end
 
   def test_eq
-    assert_equal @anonymous_process, @anonymous_process
+    assert_equal @process, @process
   end
   
   def test_not_eq
-    refute_equal Process.pid, @anonymous_process
+    refute_equal Process.pid, @process
   end
 
   def test_to_s
-    assert_equal "(pid=#{Process.pid}, name=#{@anonymous_process.name()})", 
-      @anonymous_process.to_s
+    assert_equal "(pid=#{Process.pid}, name=#{@process.name()})", 
+      @process.to_s
   end
 
   def test_inspect
-    assert_equal "(pid=#{Process.pid}, name=#{@anonymous_process.name()})".inspect, 
-      @anonymous_process.inspect
+    assert_equal "(pid=#{Process.pid}, name=#{@process.name()})".inspect, 
+      @process.inspect
   end
 
   def test_name
     # current process
-    assert_equal true, @anonymous_process.name().start_with?('ruby')
+    assert_equal true, @process.name().start_with?('ruby')
   end
 
   def test_cmdline
     # should be run with `rake test`
-    assert_equal '-Ilib:lib:test', @anonymous_process.cmdline()[1]
+    assert_equal '-Ilib:lib:test', @process.cmdline()[1]
+  end
+
+  def test_exe
+    assert_equal true, @process.exe().start_with?("/usr/bin/ruby")
   end
 
 end

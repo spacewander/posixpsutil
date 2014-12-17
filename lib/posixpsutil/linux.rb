@@ -106,9 +106,7 @@ class CPU
   #        (10) Time spent running a niced guest (virtual CPU for guest operating systems under the control of the Linux kernel).
   def self.get_cpu_fields(line)
     stat = line.split(" ")
-    # FIXME Ruby doesn't provide sysconf interface, 
-    # so I have to guess the value of sysconf(_SC_CLK_TCK)
-    clk_tck = 100
+    clk_tck = COMMON::CLOCK_TICKS 
     cpu = OpenStruct.new
     cpu.user = stat[1].to_f / clk_tck
     cpu.nice = stat[2].to_f / clk_tck

@@ -2,6 +2,9 @@ require 'socket'
 
 module COMMON
 
+# CLOCK_TICKS = 100
+CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
+     
 def self.usage_percent(used, total, _round=nil)
   # Calculate percentage usage of 'used' against 'total'.
   begin

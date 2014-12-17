@@ -118,7 +118,9 @@ class Processes
   # AccessDenied  exception is raised when retrieving that
   # particular process information.
   def to_hash(attrs=[], default={})
-    included_name = []
+    included_name = self.class.instance_methods - 
+      [:identity, :pid, :to_s, :inspect, :==, :eql?, :!=, :to_hash, 
+       :parent, :is_running, :children, :rlimit]
     ret = {}
     attrs = included_name if attrs == []
     attrs.each do |attr|
@@ -189,10 +191,44 @@ class Processes
     @name
   end
 
+  # The process executable as an absolute path.
+  # May also be an empty string.
+  # The return value is cached after first call.
+  def exe
+    if !@exe
+      begin
+        @exe = @proc.exe()
+      rescue AccessDenied => e
+        @exe = ''
+        fallback = e
+      end
+
+      if @exe == ''
+        cmdline = self.cmdline()
+        if cmdline
+          exe = cmdline[0] 
+          if File.exists?(exe) && File.realpath == exe \
+            && File.stat(exe).executable?
+            @exe = exe 
+          end
+        else
+          raise fallback if fallback
+        end
+      end
+    end
+    @exe
+  end
+
   # The command line this process has been called with.
   # An array will be returned
   def cmdline
     @proc.cmdline()
+  end
+
+  # Return a #<OpenStruct user, system> representing the
+  # accumulated process time, in seconds.
+  def cpu_times
+    @proc.cpu_times
   end
 
   def create_time
