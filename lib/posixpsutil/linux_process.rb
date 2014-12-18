@@ -86,7 +86,8 @@ class PlatformSpecificProcess
       raise NotImplementedError.new(
         "couldn't read all necessary info from /proc/#{@pid}/io") unless item
     end
-    OpenStruct.new(rcount: rcount, wcount: wcount, rbytes: rbytes, wbytes: wbytes)
+    OpenStruct.new(rcount: rcount, wcount: wcount, 
+                   rbytes: rbytes, wbytes: wbytes)
   end
   wrap_exceptions :io_counters
 
@@ -103,6 +104,13 @@ class PlatformSpecificProcess
     tmap[tty_nr]
   end
   wrap_exceptions :terminal
+
+  def wait(timeout=nil)
+    return POSIX::wait_pid(@pid, timeout)
+    # maybe raise TimeoutExpired, need not to convert it currently
+    #rescue POSIX::TimeoutExpired
+  end
+  wrap_exceptions :wait
 
   private
 

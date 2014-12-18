@@ -1,4 +1,5 @@
 require 'socket'
+require_relative './psutil_error'
 
 module COMMON
 
@@ -132,5 +133,100 @@ module PsutilHelper
     end
 
   end
+
+end
+
+# this module places helper functions used in all posix platform 
+# Processes implementions
+module POSIX
+
+# Check whether pid exists in the current process table."""
+def pid_exists(pid)
+  # According to "man 2 kill" PID 0 has a special meaning:
+  # it refers to <<every process in the process group of the
+  # calling process>> so we don't want to go any further.
+  # If we get here it means this UNIX platform *does* have
+  # a process with id 0.
+  return true if pid == 0
+  begin
+    Process.kill(0, pid)
+    return true
+  rescue Errno::ESRCH # No such process
+    return false
+  rescue Errno::EPERM
+    # EPERM clearly means there's a process to deny access to
+    return true
+  rescue RangeError # the given pid is invalid.
+    return false
+  end
+end
+
+require 'timeout'
+
+# Wait for process with pid 'pid' to terminate and return its
+# exit status code as an integer.
+#
+# If pid is not a children of Process.pid (current process) just
+# waits until the process disappears and return nil.
+#
+# If pid does not exist at all return nil immediately.
+#
+# Raise Timeout::Error on timeout expired.
+def wait_pid(pid, timeout=nil)
+  def check_timeout(delay, stop_at, timeout)
+    if timeout
+      raise Timeout::Error if Time.now >= stop_at
+    end
+    sleep(delay)
+    delay * 2 < 0.04 ? delay * 2 : 0.04
+  end
+
+  if timeout
+    waitcall = Proc.new { Process.wait(pid, Process::WNOHANG)}
+    stop_at = Time.now + timeout
+  else
+    waitcall = Proc.new { Process.wait(pid)}
+  end
+
+  delay = 0.0001
+  while true
+    begin
+      retpid = waitcall.call()
+    rescue Errno::EINTR
+      delay = check_timeout(delay, stop_at, timeout)
+      next
+    rescue Errno::ECHILD
+      # This has two meanings:
+      # - pid is not a child of Process.pid in which case
+      #   we keep polling until it's gone
+      # - pid never existed in the first place
+      # In both cases we'll eventually return nil as we
+      # can't determine its exit status code.
+      while true
+        return nil unless pid_exists(pid)
+        delay = check_timeout(delay, stop_at, timeout)
+      end
+    end
+
+    unless retpid
+      # WNOHANG was used, pid is still running
+      delay = check_timeout(delay, stop_at, timeout)
+      next
+    end
+
+    # process exited due to a signal; return the integer of
+    # that signal
+    if $?.signaled?
+      return $?.termsig
+    # process exited using exit(2) system call; return the
+    # integer exit(2) system call has been called with
+    elsif $?.exited?
+      return $?.exitstatus
+    else
+      # should never happen
+      raise RuntimeError.new("unknown process exit status")
+    end
+  end
+end
 
 end
