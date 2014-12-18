@@ -40,13 +40,13 @@ class TestLinuxProcess < MiniTest::Test
     assert_respond_to @process.cpu_times(), :user
     assert_respond_to @process.cpu_times(), :system
   end
+
 end
 
 class TestLinuxProcessErrorHandler < MiniTest::Test
   def test_no_such_process
-    begin
+    assert_raises NoSuchProcess do
       PlatformSpecificProcess.new(99999).name()
-    rescue NoSuchProcess
     end
   end 
 
@@ -55,16 +55,15 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
   end
 
   def test_exe_access_denied
-    begin
+    assert_raises AccessDenied do
       PlatformSpecificProcess.new(1).exe()
-    rescue AccessDenied
     end
   end
 
   def test_exe_no_such_process
-    begin
+    assert_raises NoSuchProcess do
       PlatformSpecificProcess.new(99999).exe()
-    rescue NoSuchProcess
     end
   end
+
 end
