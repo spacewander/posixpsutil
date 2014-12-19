@@ -272,21 +272,59 @@ class Processes
     @proc.nice = value
   end
 
+  # Return process UIDs as #<OpenStruct real, effective, saved>
   def uids
     @proc.uids
   end
 
+  # Return process GIDs as #<OpenStruct real, effective, saved>
   def gids
     @proc.gids
   end
 
+  # The terminal associated with this process, if any, else nil.
   def terminal
     @proc.terminal
   end
 
+  # Return the number of file descriptors opened by this process
   def num_fds
     @proc.num_fds
   end
+
+  if PlatformSpecificProcess.method_defined? :io_counters
+    # Linux, BSD only
+    #
+    # Return process I/O statistics as a
+    # #<OpenStruct read_count, write_count, read_bytes, write_bytes>
+    #
+    # Those are the number of read/write calls performed and the
+    # amount of bytes read and written by the process.
+    def io_counters
+      @proc.io_counters
+    end
+  end
+
+  if PlatformSpecificProcess.method_defined?(:ionice) \
+    && PlatformSpecificProcess.method_defined?(:set_ionice)
+    # Linux only
+    #
+    # Get or set process I/O niceness (priority).
+    #
+    # On Linux 'ioclass' is one of the IOPRIO_CLASS_* constants.
+    # 'value' is a number which goes from 0 to 7. The higher the
+    # value, the lower the I/O priority of the process.
+    def ionice(ioclass, value)
+      if ioclass.nil? 
+        raise ArgumentError.new("'ioclass' must be specified") if value
+        return @proc.ionice
+      else
+        # If the value is nil, a reasonable value will be assigned
+        return @proc.set_ionice(ioclass, value)
+      end
+    end
+  end
+
 end
 
 

@@ -132,6 +132,14 @@ class PlatformSpecificProcess
   end
   wrap_exceptions :io_counters
 
+  def ionice
+    # TODO implement it with C
+  end
+
+  def set_ionice(ioclass, value)
+    # TODO implement it with C
+  end
+
   def name
     @name = File.new("/proc/#{@pid}/stat").readline.
       split(' ')[1][/\((.+?)\)/, 1] unless @name
@@ -147,7 +155,7 @@ class PlatformSpecificProcess
   wrap_exceptions :nice
 
   def nice=
-    # will be inplemented with C
+    # TODO will be inplemented with C
   end
   wrap_exceptions :nice=
 
@@ -168,7 +176,7 @@ class PlatformSpecificProcess
   def terminal
     tmap = get_terminal_map
     tty_nr = IO.read("/proc/#{@pid}/stat").split(' ')[6].to_i
-    tmap[tty_nr]
+    tmap[tty_nr] # if tty_nr is not a key of tmap, retun nil
   end
   wrap_exceptions :terminal
 

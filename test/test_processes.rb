@@ -75,3 +75,32 @@ class TestProcesses < MiniTest::Test
   end
 
 end
+
+class TestPlatformSpecificMethod < MiniTest::Test
+  def test_has_io_counters
+    has_method_defined = Processes.method_defined?('io_counters')
+    os = RbConfig::CONFIG['host_os']
+    if os =~ /linux/
+      assert_equal true, has_method_defined
+    else
+      assert_equal false, has_method_defined
+    end
+  end 
+
+  def test_has_ionice
+    has_method_defined = Processes.method_defined?('ionice')
+    os = RbConfig::CONFIG['host_os']
+    if os =~ /linux|bsd/
+      assert_equal true, has_method_defined
+    else
+      assert_equal false, has_method_defined
+    end
+  end
+
+  if Processes.method_defined?('ionice')
+    def test_ionice
+      # TODO test when it completed
+    end
+  end
+
+end
