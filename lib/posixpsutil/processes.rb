@@ -325,6 +325,29 @@ class Processes
     end
   end
 
+  # Linux only
+  if PlatformSpecificProcess.method_defined? :rlimit
+    def rlimit(resource, limits=nil)
+    end
+  end
+
+  # Linux only
+  if PlatformSpecificProcess.method_defined? :cpu_affinity
+    def cpu_affinity(cpus=nil)
+    end
+  end
+
+  # Return the number of voluntary and involuntary context
+  # switches performed by this process.
+  def num_ctx_switches
+    @proc.num_ctx_switches
+  end
+
+  # Return the number of threads used by this process.
+  def num_threads
+    @proc.num_threads
+  end
+
 end
 
 

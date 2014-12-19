@@ -29,6 +29,7 @@ class TestPsutilError < MiniTest::Test
         assert_equal "process no longer exists (pid=3000)", e.message
       end
    end
+
 end
 
 class TestProcesses < MiniTest::Test
@@ -100,6 +101,26 @@ class TestPlatformSpecificMethod < MiniTest::Test
   if Processes.method_defined?('ionice')
     def test_ionice
       # TODO test when it completed
+    end
+  end
+
+  def test_has_rlimit
+    has_method_defined = Processes.method_defined?('rlimit')
+    os = RbConfig::CONFIG['host_os']
+    if os =~ /linux/
+      assert_equal true, has_method_defined
+    else
+      assert_equal false, has_method_defined
+    end
+  end
+
+  def test_has_cpu_affinity
+    has_method_defined = Processes.method_defined?('cpu_affinity')
+    os = RbConfig::CONFIG['host_os']
+    if os =~ /linux/
+      assert_equal true, has_method_defined
+    else
+      assert_equal false, has_method_defined
     end
   end
 

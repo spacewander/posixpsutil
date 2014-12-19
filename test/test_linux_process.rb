@@ -51,8 +51,19 @@ class TestLinuxProcess < MiniTest::Test
     @process.nice
   end
 
+  def test_num_ctx_switches
+    assert_respond_to @process.num_ctx_switches, :voluntary
+    assert_respond_to @process.num_ctx_switches, :involuntary
+  end
+
   def test_num_fds
     @process.num_fds
+  end
+
+  def test_num_threads
+    # the result is different from Thread.list.size, because
+    # it shows the number of threads in system size instead of ruby size
+    @process.num_threads
   end
 
   def test_status

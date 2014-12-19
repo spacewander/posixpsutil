@@ -70,6 +70,16 @@ class PlatformSpecificProcess
   end
   wrap_exceptions :cwd
 
+  def cpu_affinity
+    # TODO implement it with C
+  end
+  wrap_exceptions :cpu_affinity
+
+  def cpu_affinity=(cpus)
+    # TODO
+  end
+  wrap_exceptions :cpu_affinity=
+
   def exe
     begin
       # readlink() might return paths containing null bytes ('\x00').
@@ -135,10 +145,12 @@ class PlatformSpecificProcess
   def ionice
     # TODO implement it with C
   end
+  wrap_exceptions :ionice
 
   def set_ionice(ioclass, value)
     # TODO implement it with C
   end
+  wrap_exceptions :set_ionice
 
   def name
     @name = File.new("/proc/#{@pid}/stat").readline.
@@ -159,11 +171,46 @@ class PlatformSpecificProcess
   end
   wrap_exceptions :nice=
 
+  def num_ctx_switches
+    vol = nonvol = nil
+    IO.readlines("/proc/#{@pid}/status").each do |line|
+      if line.start_with?("voluntary_ctxt_switches")
+        vol = line.split[1].to_i
+      elsif line.start_with?("nonvoluntary_ctxt_switches")
+        nonvol = line.split[1].to_i
+      end
+
+      if vol && nonvol
+        return OpenStruct.new(voluntary: vol, involuntary: nonvol)
+      end
+    end
+    msg = <<-EOF.gsub(/(?:^\s+\||\n)/, '')
+      |'voluntary_ctxt_switches' and 'nonvoluntary_ctxt_switches'
+      | fields were not found in /proc/#{@pid}/status; the kernel is 
+      |probably older than 2.6.23
+    EOF
+    raise NotImplementedError.new(msg)
+  end
+  wrap_exceptions :num_ctx_switches
+
   def num_fds
     Dir.entries("/proc/#{@pid}/fd").size - 2 # ignore '.' and '..'
   end
   wrap_exceptions :num_fds
+
+  def num_threads
+    IO.readlines("/proc/#{@pid}/status").each do |line|
+      return line.split[1].to_i if line.start_with?("Threads:")
+    end
+    raise NotImplementedError.new("line not found")
+  end
+  wrap_exceptions :num_threads
   
+  def rlimit(resource, limits=nil)
+    # TODO implement it with C
+  end
+  wrap_exceptions :rlimit
+
   def status
     PROC_STATUSES.default = '?'
     IO.readlines("/proc/#{@pid}/status").each do |line|
