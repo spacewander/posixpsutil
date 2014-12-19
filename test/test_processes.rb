@@ -70,4 +70,8 @@ class TestProcesses < MiniTest::Test
     assert_equal true, @process.exe().start_with?("/usr/bin/ruby")
   end
 
+  def test_username
+    @process.username()
+  end
+
 end

@@ -6,6 +6,19 @@ module COMMON
 # CLOCK_TICKS = 100
 CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
      
+STATUS_RUNNING = "running"
+STATUS_SLEEPING = "sleeping"
+STATUS_DISK_SLEEP = "disk-sleep"
+STATUS_STOPPED = "stopped"
+STATUS_TRACING_STOP = "tracing-stop"
+STATUS_ZOMBIE = "zombie"
+STATUS_DEAD = "dead"
+STATUS_WAKE_KILL = "wake-kill"
+STATUS_WAKING = "waking"
+STATUS_IDLE = "idle"  # BSD
+STATUS_LOCKED = "locked"  # BSD
+STATUS_WAITING = "waiting"  # BSD
+
 def self.usage_percent(used, total, _round=nil)
   # Calculate percentage usage of 'used' against 'total'.
   begin
@@ -131,7 +144,12 @@ module PsutilHelper
       end # each lines
       ret
     end
+  end
 
+  def self.boot_time
+    IO.readlines('/proc/stat').each do |line|
+      return line.strip.split[1].to_f if line.start_with?('btime')
+    end
   end
 
 end
@@ -148,9 +166,9 @@ def pid_exists(pid)
   # If we get here it means this UNIX platform *does* have
   # a process with id 0.
   return true if pid == 0
-  begin
-    Process.kill(0, pid)
-    return true
+
+  Process.kill(0, pid)
+  return true
   rescue Errno::ESRCH # No such process
     return false
   rescue Errno::EPERM
@@ -158,7 +176,6 @@ def pid_exists(pid)
     return true
   rescue RangeError # the given pid is invalid.
     return false
-  end
 end
 
 require 'timeout'
@@ -182,14 +199,14 @@ def wait_pid(pid, timeout=nil)
   end
 
   if timeout
-    waitcall = Proc.new { Process.wait(pid, Process::WNOHANG)}
+    waitcall = proc { Process.wait(pid, Process::WNOHANG)}
     stop_at = Time.now + timeout
   else
-    waitcall = Proc.new { Process.wait(pid)}
+    waitcall = proc { Process.wait(pid)}
   end
 
   delay = 0.0001
-  while true
+  loop do
     begin
       retpid = waitcall.call()
     rescue Errno::EINTR
@@ -202,7 +219,7 @@ def wait_pid(pid, timeout=nil)
       # - pid never existed in the first place
       # In both cases we'll eventually return nil as we
       # can't determine its exit status code.
-      while true
+      loop do
         return nil unless pid_exists(pid)
         delay = check_timeout(delay, stop_at, timeout)
       end

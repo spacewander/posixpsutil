@@ -288,7 +288,7 @@ class Disks
     partitions = []
     lines = IO.readlines('/proc/partitions')[2..-1]
     # reverse lines so sda will be below sda1
-    lines.reverse.each do |line|
+    lines.reverse_each do |line|
       name = line.split(' ')[3]
       if name[-1] === /\d/
         # we're dealing with a partition (e.g. 'sda1'); 'sda' will
@@ -413,7 +413,7 @@ class Network
   def self.net_connections(interface=:inet)
     ret = []
     connection = Connection.new
-    return nil unless connection.tmap.has_key?(interface)
+    return nil unless connection.tmap.key?(interface)
     connection.tmap[interface].each do |kind|
       f, family, type = kind
       if [AF_INET, AF_INET6].include?(family)
@@ -463,11 +463,7 @@ class System
 
   # return system boot time expressed in seconds since epoch
   def self.boot_time()
-    unless @boot_at
-      IO.readlines('/proc/stat').each do |line|
-        @boot_at = line.strip.split[1].to_f if line.start_with?('btime')
-      end
-    end
+    @boot_at = PsutilHelper::boot_time if @boot_at.nil?
     @boot_at
   end
 

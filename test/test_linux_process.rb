@@ -12,11 +12,27 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_cpu_times
-    @process.cpu_times()
+    assert_equal Process.times.utime, @process.cpu_times().user
+    assert_equal Process.times.stime, @process.cpu_times().system
+  end
+
+  def test_create_time
+    assert_equal true, @process.create_time() < Time.now.to_f
+  end
+
+  def test_cwd
+    assert_equal Dir.pwd, @process.cwd()
   end
 
   def test_exe
     assert_equal true, @process.exe().start_with?("/usr/bin/ruby")
+  end
+
+  def test_gids
+    gids = @process.gids
+    assert_equal Process::GID.rid, gids.real
+    assert_equal Process::GID.eid, gids.effective
+    assert_respond_to gids, :saved
   end
 
   def test_io_counters
@@ -31,14 +47,28 @@ class TestLinuxProcess < MiniTest::Test
     assert_equal true, @process.name().start_with?('ruby')
   end
 
+  def test_nice
+    @process.nice
+  end
+
+  def test_num_fds
+    @process.num_fds
+  end
+
+  def test_status
+    assert_equal 'running', @process.status()
+  end
+
   def test_terminal
     tty = @process.terminal()
     assert_equal true, tty.start_with?('/dev/tty') || tty.start_with?('/dev/pts/')
   end
 
-  def test_cpu_times
-    assert_respond_to @process.cpu_times(), :user
-    assert_respond_to @process.cpu_times(), :system
+  def test_uids
+    uids = @process.uids
+    assert_equal Process::UID.rid, uids.real
+    assert_equal Process::UID.eid, uids.effective
+    assert_respond_to uids, :saved
   end
 
 end

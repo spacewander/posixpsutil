@@ -1,3 +1,4 @@
+require 'etc'
 require 'ostruct'
 require 'rbconfig'
 require_relative 'psutil_error'
@@ -57,7 +58,6 @@ class Processes
     @exe = nil
     @create_time = nil 
     @gone = false
-    @hash = nil
     @proc = PlatformSpecificProcess.new(@pid)
     @last_sys_cpu_times = nil
     @last_proc_cpu_times = nil
@@ -128,10 +128,10 @@ class Processes
       begin
         ret[attr] = attr()
       rescue AccessDenied
-        ret[attr] = default[attr] if default.has_key? attr
+        ret[attr] = default[attr] if default.key? attr
       rescue NotImplementedError
         raise if attrs
-        ret[attr] = default[attr] if default.has_key? attr
+        ret[attr] = default[attr] if default.key? attr
       end
     end
     ret
@@ -225,16 +225,68 @@ class Processes
     @proc.cmdline()
   end
 
+  # The process current status as a STATUS_* constant.
+  def status
+    @proc.status()
+  end
+  
+  # The name of the user that owns the process.
+  def username
+    # the uid got from Process Module is real uid yet
+    real_uid = Process.uid
+    begin
+      return Etc::getpwuid(real_uid).name
+    rescue ArgumentError
+      return real_uid.to_s
+    end
+  end
+
   # Return a #<OpenStruct user, system> representing the
   # accumulated process time, in seconds.
   def cpu_times
     @proc.cpu_times
   end
 
+  # The process creation time as a floating point number
+  # expressed in seconds since the epoch, in UTC.
+  # The return value is cached after first call.
   def create_time
-    nil
+    if @create_time.nil?
+      @create_time = @proc.create_time
+    end
+    @create_time
   end
 
+  # Process current working directory as an absolute path.
+  def cwd
+    @proc.cwd
+  end
+  
+  # Get or set process niceness (priority).
+  def nice
+    @proc.nice
+  end
+
+  def nice=(value)
+    raise NoSuchProcess.new(pid:@pid, name:@name) unless is_running()
+    @proc.nice = value
+  end
+
+  def uids
+    @proc.uids
+  end
+
+  def gids
+    @proc.gids
+  end
+
+  def terminal
+    @proc.terminal
+  end
+
+  def num_fds
+    @proc.num_fds
+  end
 end
 
 
