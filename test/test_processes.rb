@@ -52,6 +52,27 @@ class TestProcesses < MiniTest::Test
       @process.to_s
   end
 
+  def test_to_hash
+    hash = @process.to_hash([:status, :cwd])
+    assert_equal 2, hash.keys.size
+    assert_equal @process.status, hash[:status]
+    assert_equal @process.cwd, hash[:cwd]
+  end
+
+  def test_to_hash
+    default = {
+      :root_dir => 'sleeping',
+      :sleep => '/'
+    }
+    assert_raises NotImplementedError do
+      @process.to_hash([:sleep, :root_dir], default)
+    end
+  end
+
+  def test_to_hash_symbol_only
+    assert_equal true, @process.to_hash(["exe", "cwd"]).empty?
+  end
+
   def test_inspect
     assert_equal "(pid=#{Process.pid}, name=#{@process.name()})".inspect, 
       @process.inspect

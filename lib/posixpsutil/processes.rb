@@ -107,30 +107,43 @@ class Processes
   
   # Utility method returning process information as a hash.
   # Unlike normal to_hash method, this method can accept two params,
-  # attrs and default
+  # given_attrs and default
   #
-  # If 'attrs' is specified it must be a list of strings
+  # If 'given_attrs' is specified it must be a list of symbols
   # reflecting available Process class' attribute names
-  # (e.g. ['cpu_times', 'name']) else all public (read
+  # (e.g. [:cpu_times, :name]) else all public (read
   # only) attributes are assumed.
 
   # 'default' is the value which gets assigned in case
   # AccessDenied  exception is raised when retrieving that
   # particular process information.
-  def to_hash(attrs=[], default={})
-    included_name = self.class.instance_methods - 
-      [:identity, :pid, :to_s, :inspect, :==, :eql?, :!=, :to_hash, 
-       :parent, :is_running, :children, :rlimit]
+  def to_hash(given_attrs=[], default={})
+    # psutil defines some excluded methods, they won't be accessed via
+    # this method.
+    #
+    # psutil want to warn us that the process with given pid may gone,
+    # as the comment at the head of the class says.
+    excluded_names = [:identity, :pid, :to_s, :inspect, :==, :eql?, 
+                      :!=, :to_hash, :parent, :is_running, :children, :rlimit]
+
+    respond_to_methods = self.public_methods(false)
+    included_names = respond_to_methods - excluded_names
     ret = {}
-    attrs = included_name if attrs == []
+    attrs = (given_attrs ? given_attrs : included_names)
     attrs.each do |attr|
-      ret[attr] = nil
+      next if !attr.is_a?(Symbol) || attr.to_s.end_with?('=')
       begin
-        ret[attr] = attr()
+        # filter unsafe methods
+        if respond_to_methods.include?(attr)
+          ret[attr] = method(attr).call()
+        else
+          # in case of not implemented functionality (may happen
+          # on old or exotic systems) we want to crash only if
+          # the user explicitly asked for that particular attr
+          raise NotImplementedError if given_attrs
+          ret[attr] = default[attr] if default.key? attr
+        end
       rescue AccessDenied
-        ret[attr] = default[attr] if default.key? attr
-      rescue NotImplementedError
-        raise if attrs
         ret[attr] = default[attr] if default.key? attr
       end
     end
@@ -314,7 +327,7 @@ class Processes
     # On Linux 'ioclass' is one of the IOPRIO_CLASS_* constants.
     # 'value' is a number which goes from 0 to 7. The higher the
     # value, the lower the I/O priority of the process.
-    def ionice(ioclass, value)
+    def ionice(ioclass=nil, value=nil)
       if ioclass.nil? 
         raise ArgumentError.new("'ioclass' must be specified") if value
         return @proc.ionice

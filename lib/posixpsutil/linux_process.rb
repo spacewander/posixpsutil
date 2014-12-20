@@ -25,7 +25,6 @@ class PlatformSpecificProcess
     @name = nil
   end
 
-
   # Decorator which translates Errno::ENOENT, Errno::ESRCH into AccessDenied;
   # Errno::EPERM, Errno::EACCES into NoSuchProcess.
   def self.wrap_exceptions(method)
@@ -44,7 +43,6 @@ class PlatformSpecificProcess
   def cmdline
     File.new("/proc/#{@pid}/cmdline").read.split("\x00").delete_if {|x| !x}
   end
-  wrap_exceptions :cmdline
 
   def cpu_times
     st = IO.read("/proc/#{@pid}/stat").strip
@@ -63,22 +61,18 @@ class PlatformSpecificProcess
     @@boot_time = PsutilHelper::boot_time() if @@boot_time.nil?
     return @@boot_time + values[19].to_f / COMMON::CLOCK_TICKS
   end
-  wrap_exceptions :create_time
 
   def cwd
     File.readlink("/proc/#{@pid}/cwd").sub("\x00", "")
   end
-  wrap_exceptions :cwd
 
   def cpu_affinity
     # TODO implement it with C
   end
-  wrap_exceptions :cpu_affinity
 
   def cpu_affinity=(cpus)
     # TODO
   end
-  wrap_exceptions :cpu_affinity=
 
   def exe
     begin
@@ -118,7 +112,6 @@ class PlatformSpecificProcess
     # impossible to reach here
     raise NotImplementedError.new('line not found')
   end
-  wrap_exceptions :gids
 
   def io_counters
     rcount = wcount = rbytes = wbytes = nil
@@ -140,36 +133,30 @@ class PlatformSpecificProcess
     OpenStruct.new(rcount: rcount, wcount: wcount, 
                    rbytes: rbytes, wbytes: wbytes)
   end
-  wrap_exceptions :io_counters
 
   def ionice
     # TODO implement it with C
   end
-  wrap_exceptions :ionice
 
   def set_ionice(ioclass, value)
     # TODO implement it with C
   end
-  wrap_exceptions :set_ionice
 
   def name
     @name = File.new("/proc/#{@pid}/stat").readline.
       split(' ')[1][/\((.+?)\)/, 1] unless @name
     @name
   end
-  wrap_exceptions :name
 
   def nice
     # A value in the range 19 (low priority) to -20 (high priority).
     # Use `man proc` to see the difference between priority and nice.
     IO.read("/proc/#{@pid}/stat").split[18].to_i
   end
-  wrap_exceptions :nice
 
   def nice=
     # TODO will be inplemented with C
   end
-  wrap_exceptions :nice=
 
   def num_ctx_switches
     vol = nonvol = nil
@@ -191,12 +178,10 @@ class PlatformSpecificProcess
     EOF
     raise NotImplementedError.new(msg)
   end
-  wrap_exceptions :num_ctx_switches
 
   def num_fds
     Dir.entries("/proc/#{@pid}/fd").size - 2 # ignore '.' and '..'
   end
-  wrap_exceptions :num_fds
 
   def num_threads
     IO.readlines("/proc/#{@pid}/status").each do |line|
@@ -204,12 +189,14 @@ class PlatformSpecificProcess
     end
     raise NotImplementedError.new("line not found")
   end
-  wrap_exceptions :num_threads
   
+  def ppid
+    1
+  end
+
   def rlimit(resource, limits=nil)
     # TODO implement it with C
   end
-  wrap_exceptions :rlimit
 
   def status
     PROC_STATUSES.default = '?'
@@ -218,14 +205,12 @@ class PlatformSpecificProcess
       return PROC_STATUSES[line.split[1]] if line.start_with?('State:')
     end
   end
-  wrap_exceptions :status
 
   def terminal
     tmap = get_terminal_map
     tty_nr = IO.read("/proc/#{@pid}/stat").split(' ')[6].to_i
     tmap[tty_nr] # if tty_nr is not a key of tmap, retun nil
   end
-  wrap_exceptions :terminal
 
   def uids
     IO.readlines("/proc/#{@pid}/status").each do |line|
@@ -238,14 +223,22 @@ class PlatformSpecificProcess
     # impossible to reach here
     raise NotImplementedError.new('line not found')
   end
-  wrap_exceptions :uids
 
   def wait(timeout=nil)
     return POSIX::wait_pid(@pid, timeout)
     # maybe raise TimeoutExpired, need not to convert it currently
     #rescue POSIX::TimeoutExpired
   end
-  wrap_exceptions :wait
+
+  def self.wrap_action_except_for(wrapper, methods)
+    methods = self.instance_methods(false) - methods
+    wrapper = method(wrapper)
+    methods.each do |method|
+      wrapper.call(method)
+    end
+  end
+
+  wrap_action_except_for :wrap_exceptions, [:exe]
 
   private
 
