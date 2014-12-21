@@ -69,20 +69,28 @@ class CPU
     end
   end
 
+  @logical_cpu_count = nil
+  @physical_cpu_count = nil
   def self.cpu_count(logical=true)
     count = 0
     if !logical
-      IO.readlines('/proc/cpuinfo').each do |line|
-        count += 1 if line.start_with?('physical id')
+      unless @physical_cpu_count
+        IO.readlines('/proc/cpuinfo').each do |line|
+          count += 1 if line.start_with?('physical id')
+        end
+        @physical_cpu_count = count
       end
-      return count
+      return @physical_cpu_count
     end
 
-    Dir.entries('/sys/devices/system/cpu').each do |entry|
-      count += 1 if entry.start_with?('cpu')
+    unless @logical_cpu_count
+      Dir.entries('/sys/devices/system/cpu').each do |entry|
+        count += 1 if entry.start_with?('cpu')
+      end
+      count -= 2 # except cpuidle and cpufreq
+      @logical_cpu_count = count
     end
-    count -= 2 # except cpuidle and cpufreq
-    count
+    @logical_cpu_count
   end
 
   # The  amount  of  time,  measured in units of +USER_HZ+

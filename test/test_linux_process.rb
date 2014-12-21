@@ -66,6 +66,10 @@ class TestLinuxProcess < MiniTest::Test
     @process.num_threads
   end
 
+  def test_ppid
+    assert_equal Process.ppid, @process.ppid
+  end
+
   def test_status
     assert_equal 'running', @process.status()
   end
@@ -73,6 +77,14 @@ class TestLinuxProcess < MiniTest::Test
   def test_terminal
     tty = @process.terminal()
     assert_equal true, tty.start_with?('/dev/tty') || tty.start_with?('/dev/pts/')
+  end
+
+  def test_threads
+    threads = @process.threads
+    assert_equal @process.num_threads, @process.threads.size
+    assert_respond_to threads.first, :thread_id
+    assert_respond_to threads.first, :user_time
+    assert_respond_to threads.first, :system_time
   end
 
   def test_uids

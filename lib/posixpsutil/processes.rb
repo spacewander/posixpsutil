@@ -9,6 +9,7 @@ case os
     require_relative 'posix_process'
   when /linux/
     require_relative 'linux_process'
+    require_relative 'linux'
   else
     raise RuntimeError, "unknown os: #{os.inspect}"
 end
@@ -59,6 +60,7 @@ class Processes
     @create_time = nil 
     @gone = false
     @proc = PlatformSpecificProcess.new(@pid)
+    # for cpu_percent
     @last_sys_cpu_times = nil
     @last_proc_cpu_times = nil
     begin
@@ -123,7 +125,7 @@ class Processes
     #
     # psutil want to warn us that the process with given pid may gone,
     # as the comment at the head of the class says.
-    excluded_names = [:identity, :pid, :to_s, :inspect, :==, :eql?, 
+    excluded_names = [:identity, :to_s, :inspect, :==, :eql?, 
                       :!=, :to_hash, :parent, :is_running, :children, :rlimit]
 
     respond_to_methods = self.public_methods(false)
@@ -172,7 +174,7 @@ class Processes
   def is_running
     return false if @gone
     begin
-      return self == Processes(@pid)
+      return self == Processes.new(@pid)
     rescue NoSuchProcess
       @gone = true
       return false
@@ -359,6 +361,97 @@ class Processes
   # Return the number of threads used by this process.
   def num_threads
     @proc.num_threads
+  end
+
+  # Return threads opened by process as a list of
+  # #<OpenStruct id, user_time, system_time> representing
+  # thread id and thread CPU times (user/system).
+  def threads
+    @proc.threads
+  end
+
+  # Return a float representing the current process CPU
+  # utilization as a percentage.
+  #
+  # When interval is <= 0.0 or nil (default) compares process times
+  # to system CPU times elapsed since last call, returning
+  # immediately (non-blocking). That means that the first time
+  # this is called it will return a meaningful 0.0 value.
+  #
+  # When interval is > 0.0 compares process times to system CPU
+  # times elapsed before and after the interval.
+  #
+  # In this case is recommended for accuracy that this function
+  # be called with at least 0.1 seconds between calls.
+  # 
+  # Examples:
+  #
+  #   require 'posixpsutil'
+  #
+  #   p = Processes.new(Process.pid)
+  #   # blocking
+  #   p.cpu_percent(1)
+  #   # 2.0
+  #
+  #   # non-blocking (percentage since last call)
+  #   p.cpu_percent
+  #   # 2.9
+  #   
+  #   p = Processes.new(4527)
+  #   # first called
+  #   p.cpu_percent
+  #   # 0.0
+  #
+  #   # second called
+  #   p.cpu_percent
+  #   # 0.5
+  # 
+  def cpu_percent(interval = nil)
+    blocking = (interval && interval > 0.0)
+    num_cpus = CPU.cpu_count()
+    timer = proc { Time.now.to_f * num_cpus }
+    if blocking
+      st1 = timer.call
+      pt1 = @proc.cpu_times
+      sleep interval
+      st2 = timer.call
+      pt2 = @proc.cpu_times
+    else
+      st1 = @last_sys_cpu_times
+      pt1 = @last_proc_cpu_times
+      st2 = timer.call
+      pt2 = @proc.cpu_times
+      # first called
+      if st1.nil? || pt1.nil?
+        @last_sys_cpu_times = st2
+        @last_proc_cpu_times = pt2
+        return 0.0
+      end
+    end
+
+    delta_proc = (pt2.user - pt1.user) + (pt2.system - pt1.system)
+    delta_time = st2 - st1
+    # reset values for next call in case of interval == None
+    @last_sys_cpu_times = st2
+    @last_proc_cpu_times = pt2
+
+    begin
+      # The utilization split between all CPUs.
+      # Note: a percentage > 100 is legitimate as it can result
+      # from a process with multiple threads running on different
+      # CPU cores, see:
+      # http://stackoverflow.com/questions/1032357
+      # https://github.com/giampaolo/psutil/issues/474
+      overall_percent = ((delta_proc / delta_time) * 100) * num_cpus
+      return overall_percent.round(1)
+    rescue ZeroDivisionError
+      # interval was too low
+      return 0.0
+    end
+  end
+
+  def cpu_times
+    @proc.cpu_times
   end
 
 end

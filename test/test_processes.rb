@@ -78,6 +78,14 @@ class TestProcesses < MiniTest::Test
       @process.inspect
   end
 
+  def test_parent
+    assert_equal Process.ppid, @process.parent.pid
+  end
+
+  def test_is_running
+    assert_equal true, @process.is_running
+  end
+
   def test_name
     # current process
     assert_equal true, @process.name().start_with?('ruby')
@@ -94,6 +102,20 @@ class TestProcesses < MiniTest::Test
 
   def test_username
     @process.username()
+  end
+
+  def test_cpu_percent
+    assert_equal 0.0, @process.cpu_percent # first called
+    10000.times { |i|  i ** 6}
+    # your machine, err, may take less than 1 percent of cpu resource to
+    # finish above process
+    assert_equal true, @process.cpu_percent > 1
+
+    # test cpu_percent (blocking)
+    start = Time.now
+    @process.cpu_percent(0.1)
+    stop = Time.now
+    assert_in_delta 0.1, stop - start, 0.1
   end
 
 end

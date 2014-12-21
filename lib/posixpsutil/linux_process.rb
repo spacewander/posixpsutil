@@ -191,7 +191,10 @@ class PlatformSpecificProcess
   end
   
   def ppid
-    1
+    IO.readlines("/proc/#{@pid}/status").each do |line|
+      return line.split[1].to_i if line.start_with?("PPid:")
+    end
+    raise NotImplementedError.new("line not found")
   end
 
   def rlimit(resource, limits=nil)
@@ -212,6 +215,28 @@ class PlatformSpecificProcess
     tmap[tty_nr] # if tty_nr is not a key of tmap, retun nil
   end
 
+  def threads
+    thread_ids = Dir.entries("/proc/#{@pid}/task").sort - ['.', '..']
+    retlist = []
+    thread_ids.each do |id|
+      begin
+        st = IO.read("/proc/#{@pid}/task/#{id}/stat").strip
+        st = st[/\) (.*$)/, 1]
+        values = st.split(' ')
+        utime = values[11].to_f / COMMON::CLOCK_TICKS
+        stime = values[12].to_f / COMMON::CLOCK_TICKS
+        retlist.push(OpenStruct.new(thread_id: id, 
+                                    user_time: utime, system_time: stime))
+      rescue Errno::ENOENT
+        # check if process disappeared on us
+        # may raise NoSuchProcess
+        raise NoSuchProcess.new(pid: @pid) unless File.exists?("/proc/#{@pid}")
+        next
+      end
+    end
+    retlist
+  end
+
   def uids
     IO.readlines("/proc/#{@pid}/status").each do |line|
       if line.start_with?("Uid:")
@@ -226,8 +251,8 @@ class PlatformSpecificProcess
 
   def wait(timeout=nil)
     return POSIX::wait_pid(@pid, timeout)
-    # maybe raise TimeoutExpired, need not to convert it currently
-    #rescue POSIX::TimeoutExpired
+    # maybe raise Timeout::Error, need not to convert it currently
+    #rescue Timeout::Error
   end
 
   def self.wrap_action_except_for(wrapper, methods)
