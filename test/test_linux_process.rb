@@ -12,8 +12,9 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_cpu_times
-    assert_equal Process.times.utime, @process.cpu_times().user
-    assert_equal Process.times.stime, @process.cpu_times().system
+    cpu_times = @process.cpu_times
+    assert_equal Process.times.utime, cpu_times.user
+    assert_equal Process.times.stime, cpu_times.system
   end
 
   def test_create_time
@@ -36,10 +37,32 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_io_counters
-    assert_respond_to @process.io_counters(), :rcount
-    assert_respond_to @process.io_counters(), :wcount
-    assert_respond_to @process.io_counters(), :rbytes
-    assert_respond_to @process.io_counters(), :wbytes
+    # r means read while w means write
+    io_counters = @process.io_counters
+    assert_respond_to io_counters, :rcount
+    assert_respond_to io_counters, :wcount
+    assert_respond_to io_counters, :rbytes
+    assert_respond_to io_counters, :wbytes
+  end
+
+  def test_memory_info
+    memory_info = @process.memory_info
+    # Virtual Memory Size
+    assert_respond_to memory_info, :vms
+    # Resident Set Size
+    assert_respond_to memory_info, :rss
+  end
+
+  def test_memory_info_ex
+    memory_info_ex = @process.memory_info_ex
+    assert_respond_to memory_info_ex, :shared
+    assert_respond_to memory_info_ex, :text
+    assert_respond_to memory_info_ex, :lib
+    assert_respond_to memory_info_ex, :data
+    assert_respond_to memory_info_ex, :dirty
+    memory_info = @process.memory_info
+    assert_equal memory_info.vms, memory_info_ex.vms
+    assert_equal memory_info.rss, memory_info_ex.rss
   end
 
   def test_name
@@ -52,8 +75,9 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_num_ctx_switches
-    assert_respond_to @process.num_ctx_switches, :voluntary
-    assert_respond_to @process.num_ctx_switches, :involuntary
+    num_ctx_switches = @process.num_ctx_switches
+    assert_respond_to num_ctx_switches, :voluntary
+    assert_respond_to num_ctx_switches, :involuntary
   end
 
   def test_num_fds

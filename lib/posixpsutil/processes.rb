@@ -80,21 +80,26 @@ class Processes
   # case the cached instance is updated.
   #
   def self.process_iter
-    def add(pid)
-      p = Processes.new(pid)
-      @@pmap[p.pid] = p
-      return p
-    end
-
-    def remove(pid)
-      @@pmap[pid] = nil
-    end
-
     pre_pids = @@pmap.keys
     cur_pids = pids()
-    new_pids = cur_pids - pre_pids
     gone_pids = pre_pids - cur_pids
-    []
+    
+    gone_pids.each { |pid| @@pmap.delete(pid) }
+    cur_pids.each do |pid|
+      begin
+        unless @@pmap.key?(pid) && @@pmap[pid].is_running
+          p = Processes.new(pid)
+          @@pmap[p.pid] = p
+        end
+      rescue NoSuchProcess
+        @@pmap.delete(pid)
+      rescue AccessDenied
+        # Process creation time can't be determined hence there's
+        # no way to tell whether the pid of the cached process
+        next
+      end
+    end
+    @@pmap.values
   end
 
   
@@ -242,11 +247,12 @@ class Processes
       @name = @proc.name()
       if @name.length >= 15
         begin
+          # return an Array represented cmdline arguments( may be [] )
           cmdline = cmdline()
         rescue AccessDenied
           cmdline = []
         end
-        if cmdline
+        if cmdline != []
           extended_name = File.basename(cmdline[0])
           @name = extended_name if extended_name.start_with?(@name)
         end
@@ -356,6 +362,12 @@ class Processes
     @proc.num_fds
   end
 
+  def wait(timeout=nil)
+    return POSIX::wait_pid(@pid, timeout)
+    # maybe raise Timeout::Error, need not to convert it currently
+    #rescue Timeout::Error
+  end
+
   if PlatformSpecificProcess.method_defined? :io_counters
     # Linux, BSD only
     #
@@ -460,6 +472,7 @@ class Processes
       # to a recursive function call.
       checkpids = [@pid]
       checkpids.each do |pid|
+        next unless table.key? pid
         table[pid].each do |child|
           begin
             # if child happens to be older than its parent,
@@ -573,12 +586,43 @@ class Processes
     @proc.cpu_times
   end
 
-  def wait(timeout=nil)
-    return POSIX::wait_pid(@pid, timeout)
-    # maybe raise Timeout::Error, need not to convert it currently
-    #rescue Timeout::Error
+  # Return an OpenStruct representing RSS (Resident Set Size) and VMS
+  # (Virtual Memory Size) in bytes.
+  def memory_info
+    @proc.memory_info
   end
 
-end
+  # Return an OpenStruct with variable fields depending on the
+  # platform representing extended memory information about
+  # this process. All numbers are expressed in bytes.
+  def memory_info_ex
+    @proc.memory_info_ex
+  end
 
+  @@total_phymem = nil
+  # Compare physical system memory to process resident memory
+  # (RSS) and calculate process memory utilization as a percentage.
+  def memory_percent
+    rss = @proc.memory_info.rss
+    @@total_phymem = Memory.virtual_memory.total if @@total_phymem.nil?
+    begin
+      return (rss / @@total_phymem.to_f) * 100
+    rescue ZeroDivisionError
+      return 0.0
+    end
+  end
+
+  def self.assert_pid_not_reused(methods)
+    methods.each do |method|
+      old_method = instance_method(method)
+      define_method method do |*args, &block|
+        raise NoSuchProcess(pid: @pid, name: name()) unless is_running
+        old_method.bind(self).call(*args, &block)
+      end
+    end
+  end
+
+  assert_pid_not_reused [:children]
+
+end
 

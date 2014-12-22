@@ -15,6 +15,9 @@ PROC_STATUSES = {
     "W" => COMMON::STATUS_WAKING
 }
 
+PAGE_SIZE = COMMON::PAGE_SIZE
+CLOCK_TICKS = COMMON::CLOCK_TICKS
+
 class PlatformSpecificProcess < PsutilHelper::Processes
   # for class scope variable which should be memorized
   @@terminal_map = {}
@@ -42,7 +45,7 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def cmdline
-    File.new("/proc/#{@pid}/cmdline").read.split("\x00").delete_if {|x| !x}
+    IO.read("/proc/#{@pid}/cmdline").split("\x00").delete_if {|x| !x}
   end
 
   def cpu_times
@@ -50,8 +53,8 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     # ignore the first two values ("pid (exe)")
     st = st[/\) (.*$)/, 1]
     values = st.split(' ')
-    utime = values[11].to_f / COMMON::CLOCK_TICKS
-    stime = values[12].to_f / COMMON::CLOCK_TICKS
+    utime = values[11].to_f / CLOCK_TICKS
+    stime = values[12].to_f / CLOCK_TICKS
     OpenStruct.new(user:utime, system:stime)
   end
 
@@ -60,7 +63,7 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     st = st[/\) (.*$)/, 1]
     values = st.split(' ')
     @@boot_time = PsutilHelper::boot_time() if @@boot_time.nil?
-    return @@boot_time + values[19].to_f / COMMON::CLOCK_TICKS
+    return @@boot_time + values[19].to_f / CLOCK_TICKS
   end
 
   def cwd
@@ -143,6 +146,30 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     # TODO implement it with C
   end
 
+  def memory_info
+    vms, rss = File.new("/proc/#{@pid}/statm").readline.split[0...2]
+    OpenStruct.new(vms: vms.to_i * PAGE_SIZE, 
+                   rss: rss.to_i * PAGE_SIZE)
+  end
+
+  #  ============================================================
+  # | FIELD  | DESCRIPTION                         | AKA  | TOP  |
+  #  ============================================================
+  # | rss    | resident set size                   |      | RES  |
+  # | vms    | total program size                  | size | VIRT |
+  # | shared | shared pages (from shared mappings) |      | SHR  |
+  # | text   | text ('code')                       | trs  | CODE |
+  # | lib    | library (unused in Linux 2.6)       | lrs  |      |
+  # | data   | data + stack                        | drs  | DATA |
+  # | dirty  | dirty pages (unused in Linux 2.6)   | dt   |      |
+  #  ============================================================
+  def memory_info_ex
+    info = File.new("/proc/#{@pid}/statm").readline.split[0...7]
+    vms, rss, shared, text, lib, data, dirty = info.map {|i| i.to_i * PAGE_SIZE}
+    OpenStruct.new(vms: vms, rss: rss, shared: shared, text: text, lib: lib,
+                  data: data, dirty: dirty)
+  end
+  
   def name
     @name = File.new("/proc/#{@pid}/stat").readline.
       split(' ')[1][/\((.+?)\)/, 1] unless @name

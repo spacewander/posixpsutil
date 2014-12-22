@@ -125,9 +125,18 @@ class TestProcesses < MiniTest::Test
   end
 
   def test_children
-    @process.children
+    sh = @process.parent()
+    assert_equal true, sh.children().include?(@process)
+    children = sh.parent.children(true)
+    assert_equal true, children.include?(@process)
+    assert_equal true, children.include?(sh)
   end
 
+  def test_memory_percent
+    @process.memory_percent
+    # total memory should be cached after first called
+    refute_equal nil, Processes.class_variable_get(:@@total_phymem)
+  end
 end
 
 class TestPlatformSpecificMethod < MiniTest::Test
@@ -186,6 +195,11 @@ class TestProcessesClassMethods < MiniTest::Test
   end
 
   def test_process_iter
-    Processes.process_iter
+    process_iter = Processes.process_iter
+    assert_equal true, process_iter.include?(Processes.new(Process.pid))
+    assert_equal true, process_iter.include?(Processes.new(1))
+    # process_iter should cache processes in @@pmap
+    pmap = Processes.class_variable_get(:@@pmap)
+    assert_equal true, process_iter.size == pmap.size
   end 
 end

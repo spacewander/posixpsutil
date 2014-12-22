@@ -234,9 +234,9 @@ class Memory
     IO.readlines('/proc/vmstat').each do |line|
       # values are expressed in 4 KB, we want bytes instead
       if line.start_with?('pswpin')
-        meminfo.sin = line.split(' ')[1].to_i * 4 * 1024
+        meminfo.sin = line.split(' ')[1].to_i * COMMON::PAGE_SIZE
       elsif line.start_with?('pswpout')
-        meminfo.sout = line.split(' ')[1].to_i * 4 * 1024
+        meminfo.sout = line.split(' ')[1].to_i * COMMON::PAGE_SIZE
       end
     end
 

@@ -6,6 +6,8 @@ module COMMON
 
 # CLOCK_TICKS = 100
 CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
+# PAGE_SIZE = 4096
+PAGE_SIZE = IO.popen('getconf PAGE_SIZE').read.to_i
      
 STATUS_RUNNING = "running"
 STATUS_SLEEPING = "sleeping"
