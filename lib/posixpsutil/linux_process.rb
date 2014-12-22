@@ -1,4 +1,5 @@
 require_relative 'common'
+require_relative 'linux_helper'
 require_relative 'psutil_error'
 
 PROC_STATUSES = {
@@ -14,7 +15,7 @@ PROC_STATUSES = {
     "W" => COMMON::STATUS_WAKING
 }
 
-class PlatformSpecificProcess
+class PlatformSpecificProcess < PsutilHelper::Processes
   # for class scope variable which should be memorized
   @@terminal_map = {}
   @@boot_time = nil
@@ -247,12 +248,6 @@ class PlatformSpecificProcess
     end
     # impossible to reach here
     raise NotImplementedError.new('line not found')
-  end
-
-  def wait(timeout=nil)
-    return POSIX::wait_pid(@pid, timeout)
-    # maybe raise Timeout::Error, need not to convert it currently
-    #rescue Timeout::Error
   end
 
   def self.wrap_action_except_for(wrapper, methods)

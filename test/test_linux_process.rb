@@ -120,3 +120,12 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
   end
 
 end
+
+class TestLinuxProcessClassMethods < MiniTest::Test
+  def test_pids
+    pids = PlatformSpecificProcess.pids
+    assert_equal true, pids.include?(1)
+    assert_equal true, pids.include?(Process.pid)
+  end
+
+end

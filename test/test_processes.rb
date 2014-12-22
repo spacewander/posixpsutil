@@ -106,16 +106,26 @@ class TestProcesses < MiniTest::Test
 
   def test_cpu_percent
     assert_equal 0.0, @process.cpu_percent # first called
-    10000.times { |i|  i ** 6}
-    # your machine, err, may take less than 1 percent of cpu resource to
+    #10000.times { |i|  i ** 6}
+    # your machine, err, may take less than 50 percent of cpu resource to
     # finish above process
-    assert_equal true, @process.cpu_percent > 1
+    #assert_equal true, @process.cpu_percent > 50
+    sleep 0.1
+    last_proc_cpu_times = @process.instance_variable_get(:@last_proc_cpu_times)
+    last_proc_cpu_times.user -= 0.1
+    @process.instance_variable_set(:@last_proc_cpu_times, last_proc_cpu_times)
+    # approximately 100
+    assert_equal true, @process.cpu_percent > 50
 
     # test cpu_percent (blocking)
     start = Time.now
     @process.cpu_percent(0.1)
     stop = Time.now
     assert_in_delta 0.1, stop - start, 0.1
+  end
+
+  def test_children
+    @process.children
   end
 
 end
@@ -167,4 +177,15 @@ class TestPlatformSpecificMethod < MiniTest::Test
     end
   end
 
+end
+
+class TestProcessesClassMethods < MiniTest::Test
+
+  def test_pid_exists
+    assert_equal true, Processes.pid_exists(1)
+  end
+
+  def test_process_iter
+    Processes.process_iter
+  end 
 end

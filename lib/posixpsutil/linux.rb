@@ -1,4 +1,5 @@
 require 'ostruct'
+require 'date'
 require_relative './common'
 require_relative './linux_helper'
 
@@ -447,12 +448,10 @@ end
 
 class System
   
-  require 'date'
-
   # store boot time since it won't be changed
   @boot_at = nil
   # use `who` to get userinfo. Also, replace it with system call if possible
-  def self.users()
+  def self.users
     users = []
     IO.popen('who') do |f|
       f.readlines.each do |login_info|
@@ -470,8 +469,8 @@ class System
   end
 
   # return system boot time expressed in seconds since epoch
-  def self.boot_time()
-    @boot_at = PsutilHelper::boot_time if @boot_at.nil?
+  def self.boot_time
+    @boot_at = PsutilHelper::boot_time() if @boot_at.nil?
     @boot_at
   end
 

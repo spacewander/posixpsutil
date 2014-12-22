@@ -5,6 +5,12 @@ require_relative './common'
 # this module places all classes can be used both in Processes and in other modules
 module PsutilHelper
 
+  def self.boot_time
+    IO.readlines('/proc/stat').each do |line|
+      return line.strip.split[1].to_f if line.start_with?('btime')
+    end
+  end
+
   class Processes
     # Returns a list of PIDs currently running on the system.
     def self.pids()

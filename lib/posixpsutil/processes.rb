@@ -2,6 +2,7 @@ require 'etc'
 require 'ostruct'
 require 'rbconfig'
 require_relative 'psutil_error'
+require_relative 'common'
 
 os = RbConfig::CONFIG['host_os']
 case os
@@ -13,6 +14,7 @@ case os
   else
     raise RuntimeError, "unknown os: #{os.inspect}"
 end
+
 
 # As there is a Process Module in ruby, I change the name to Processes
 class Processes
@@ -50,6 +52,53 @@ class Processes
   attr_reader :identity
   attr_reader :pid
 
+  # class methods
+
+  # Return a list of current running PIDs.
+  def self.pids
+    PlatformSpecificProcess.pids()
+  end
+
+  # Return True if given PID exists in the current process list.
+  # This is faster than doing "pid in psutil.pids()" and
+  # should be preferred.
+  def self.pid_exists(pid)
+    return false if pid < 0
+    POSIX::pid_exists(pid)
+  end
+
+  @@pmap = {}
+
+  # Return all Processes instances for all
+  # running processes.
+  #
+  # Every new Processes instance is only created once and then cached
+  # into an internal table which is updated every time this is used.
+  #
+  # Cached Process instances are checked for identity so that you're
+  # safe in case a PID has been reused by another process, in which
+  # case the cached instance is updated.
+  #
+  def self.process_iter
+    def add(pid)
+      p = Processes.new(pid)
+      @@pmap[p.pid] = p
+      return p
+    end
+
+    def remove(pid)
+      @@pmap[pid] = nil
+    end
+
+    pre_pids = @@pmap.keys
+    cur_pids = pids()
+    new_pids = cur_pids - pre_pids
+    gone_pids = pre_pids - cur_pids
+    []
+  end
+
+  
+  # instance methods
   def initialize(pid=nil)
     pid = Process.pid unless pid
     @pid = pid
@@ -370,6 +419,76 @@ class Processes
     @proc.threads
   end
 
+  # Return the children of this process as a list of Process
+  # instances, pre-emptively checking whether PID has been reused.
+  # If recursive is true return all the parent descendants.
+
+  # Example (A == this process):
+
+  # A ─┐
+  #    │
+  #    ├─ B (child) ─┐
+  #    │             └─ X (grandchild) ─┐
+  #    │                                └─ Y (great grandchild)
+  #    ├─ C (child)
+  #    └─ D (child)
+
+  # require 'posixpsutil'
+  # p = Processes.new()
+  # p.children()
+  # # B, C, D
+  # p.children(true)
+  # # B, X, Y, C, D
+  def children(recursive = false)
+    ret = []
+    if recursive
+      # construct a hash where 'values'(an Array) are all the processes
+      # having 'key' as their parent
+      table = {}
+      self.class.process_iter().each do |p|
+        begin
+          ppid = p.ppid
+          (table.key? ppid)? table[ppid].push(p) : table[ppid] = [p]
+        rescue NoSuchProcess
+          next
+        end
+      end
+
+      # At this point we have a mapping table where table[self.pid]
+      # are the current process' children.
+      # Below, we look for all descendants recursively, similarly
+      # to a recursive function call.
+      checkpids = [@pid]
+      checkpids.each do |pid|
+        table[pid].each do |child|
+          begin
+            # if child happens to be older than its parent,
+            # it means child's PID has been reused
+            intime = (create_time() <= child.create_time())
+          rescue NoSuchProcess
+            next
+          end
+          if intime
+            ret.push(child)
+            checkpids.push(child.pid) unless checkpids.include?(child.pid)
+          end
+        end
+      end
+
+    else
+      self.class.process_iter().each do |p|
+        begin
+          ret.push(p) if p.ppid == @pid && create_time() <= p.create_time()
+        rescue NoSuchProcess
+          next
+        end
+      end
+
+    end
+
+    ret
+  end
+
   # Return a float representing the current process CPU
   # utilization as a percentage.
   #
@@ -452,6 +571,12 @@ class Processes
 
   def cpu_times
     @proc.cpu_times
+  end
+
+  def wait(timeout=nil)
+    return POSIX::wait_pid(@pid, timeout)
+    # maybe raise Timeout::Error, need not to convert it currently
+    #rescue Timeout::Error
   end
 
 end

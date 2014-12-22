@@ -1,5 +1,6 @@
 require 'socket'
-require_relative './psutil_error'
+require 'timeout'
+require_relative 'psutil_error'
 
 module COMMON
 
@@ -72,88 +73,6 @@ module NetworkConstance
 
 end
 
-# this module places all classes can be used both in Processes and in other modules
-module PsutilHelper
-  # A wrapper on top of /proc/net/* files, retrieving per-process
-  # and system-wide open connections (TCP, UDP, UNIX) similarly to
-  # "netstat -an".
-  # 
-  # Note: in case of UNIX sockets we're only able to determine the
-  # local endpoint/path, not the one it's connected to.
-  # According to [1] it would be possible but not easily.
-  #
-  # [1] http://serverfault.com/a/417946
-  class Connection
-    include NetworkConstance
-
-    def initialize()
-      # proc_filename, family, type
-      tcp4 = ["tcp", AF_INET, SOCK_STREAM]
-      tcp6 = ["tcp6", AF_INET6, SOCK_STREAM]
-      udp4 = ["udp", AF_INET, SOCK_DGRAM]
-      udp6 = ["udp6", AF_INET6, SOCK_DGRAM]
-      unix = ["unix", AF_UNIX, nil]
-      @tmap = {
-        all: [tcp4, tcp6, udp4, udp6, unix],
-        tcp: [tcp4, tcp6],
-        tcp4: [tcp4],
-        tcp6: [tcp6],
-        udp: [udp4, udp6],
-        udp4: [udp4],
-        udp6: [udp6],
-        unix: [unix],
-        inet: [tcp4, tcp6, udp4, udp6],
-        inet4: [tcp4, udp4],
-        inet6: [tcp6, udp6]
-      }
-    end
-
-    # parse /proc/net/tcp[46] and /proc/net/udp[46]
-    def process_inet(fn, family, type, filter_inodes=[])
-      f = File.new(fn)
-      f.readline()
-      ret = []
-      f.readlines.each do |line|
-        line = line.split(' ')
-        inode = line[9]
-        if filter_inodes.include?(inode)
-          inet_list = {inode: inode, laddr: decode_address(line[1]), 
-                       raddr: decode_address(line[2]), family: family, 
-                       type: type, status: CONN_NONE}
-          inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
-          ret.push(inet_list)
-        end # if inode included
-      end # each lines
-      ret
-    end
-
-    # parse /proc/net/unix 
-    def process_unix(fn, family, filter_inodes=[])
-      f = File.new(fn)
-      f.readline()
-      ret = []
-      f.readlines.each do |line|
-        line = line.split(' ')
-        inode = line[6]
-        if filter_inodes.include?(inode)
-          inet_list = {inode: inode, raddr: nil, family: family, 
-                       type: line[4].to_i, status: CONN_NONE, path: ''}
-          inet_list[:path] = line[-1] if line.size == 8
-          ret.push(inet_list)
-        end # if inode included
-      end # each lines
-      ret
-    end
-  end
-
-  def self.boot_time
-    IO.readlines('/proc/stat').each do |line|
-      return line.strip.split[1].to_f if line.start_with?('btime')
-    end
-  end
-
-end
-
 # this module places helper functions used in all posix platform 
 # Processes implementions
 module POSIX
@@ -177,8 +96,7 @@ def pid_exists(pid)
   rescue RangeError # the given pid is invalid.
     return false
 end
-
-require 'timeout'
+module_function :pid_exists
 
 # Wait for process with pid 'pid' to terminate and return its
 # exit status code as an integer.
