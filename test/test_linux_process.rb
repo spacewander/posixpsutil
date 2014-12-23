@@ -2,6 +2,9 @@ require 'minitest/autorun'
 require 'posixpsutil/linux_process'
 
 class TestLinuxProcess < MiniTest::Test
+  # since the exist of calling interval, we need a threshold
+  THRESHOLD = 0.01
+
   def setup
     @process = PlatformSpecificProcess.new(Process.pid)
   end
@@ -13,8 +16,10 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_cpu_times
     cpu_times = @process.cpu_times
-    assert_equal Process.times.utime, cpu_times.user
-    assert_equal Process.times.stime, cpu_times.system
+    assert_in_delta Process.times.utime, cpu_times.user, 
+      Process.times.utime * THRESHOLD
+    assert_in_delta Process.times.stime, cpu_times.system, 
+      Process.times.stime * THRESHOLD
   end
 
   def test_create_time
@@ -61,8 +66,10 @@ class TestLinuxProcess < MiniTest::Test
     assert_respond_to memory_info_ex, :lib
     assert_respond_to memory_info_ex, :data
     assert_respond_to memory_info_ex, :dirty
-    assert_equal memory_info.vms, memory_info_ex.vms
-    assert_equal memory_info.rss, memory_info_ex.rss
+    assert_in_delta memory_info.vms, memory_info_ex.vms, 
+      memory_info_ex.vms * THRESHOLD
+    assert_equal memory_info.rss, memory_info_ex.rss, 
+      memory_info_ex.rss * THRESHOLD
   end
 
   def test_name
