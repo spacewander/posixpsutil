@@ -612,6 +612,31 @@ class Processes
     end
   end
 
+  # Return process' mapped memory regions as a list of OpenStructs
+  # whose fields are variable depending on the platform.
+  #
+  # If 'grouped' is true the mapped regions with the same 'path'
+  # are grouped together and the different memory fields are summed.
+
+  # If 'grouped' is false every mapped region is shown as a single
+  # entity and the namedtuple will also include the mapped region's
+  # address space ('addr') and permission set ('perms').
+  def memory_maps(grouped = true)
+    maps = @proc.memory_maps
+    if grouped
+      d = {}
+      maps.each do |region|
+        path = region[2]
+        nums = region[3..-1]
+        (d[path].nil? ) ? d[path] = nums : 
+          d[path].each_index {|i| d[path][i] += nums[i]}
+      end
+      @proc.pmmap_grouped(d)
+    else
+      @proc.pmmap_ext(maps)
+    end
+  end
+
   def self.assert_pid_not_reused(methods)
     methods.each do |method|
       old_method = instance_method(method)

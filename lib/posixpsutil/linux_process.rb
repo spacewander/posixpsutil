@@ -169,6 +169,75 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     OpenStruct.new(vms: vms, rss: rss, shared: shared, text: text, lib: lib,
                   data: data, dirty: dirty)
   end
+
+  if File.exists?("/proc/#{Process.pid}/smaps")
+
+    # Return process's mapped memory regions as a list of nameduples.
+    # Fields are explained in 'man proc'; here is an updated (Apr 2012)
+    # version: http://goo.gl/fmebo
+    def memory_maps
+      lines = IO.readlines("/proc/#{@pid}/smaps")
+      return [] if lines == [] # smaps file can be empty
+
+      blocks = []
+      # the header of each section
+      first_line = lines[0]
+
+      region_data = {}
+      lines.each do |line|
+        fields = line.split(/\s+/, 6)
+        if fields[0].end_with?(':')
+          value = fields[1].to_i
+          # if fields[1] can be convert to number
+          if value == 0 && fields[1] != '0'
+            next if fields[0].start_with?('VmFlags:')
+            raise ValueError.new("don't know how to interpret line #{line}")
+          end
+          region_data[fields[0]] = value * 1024
+        else
+          # new block section
+          blocks.push([first_line, Marshal.load(Marshal.dump(region_data))])
+          region_data.clear
+          first_line = line
+        end
+      end
+      # deal with final section
+      blocks.push([first_line, region_data])
+
+      maps = []
+      blocks.each do |header, data|
+        hfields = header.split(/\s+/, 6)
+        addr, perms, _, _, _, path = hfields
+        # hfields may only have 5 parts
+        (path.nil? || path == '')? path = '[anon]' : path.strip!
+        maps.push([
+          addr,
+          perms,
+          path,
+          data.fetch('Rss:', 0),
+          data.fetch('Size:', 0),
+          data.fetch('Pss:', 0),
+          data.fetch('Shared_Clean:', 0),
+          data.fetch('Shared_Dirty:', 0),
+          data.fetch('Private_Clean:', 0),
+          data.fetch('Private_Dirty:', 0),
+          data.fetch('Referenced:', 0),
+          data.fetch('Anonymous:', 0),
+          data.fetch('Swap:', 0)
+        ])
+      end
+      maps
+    end
+
+  else
+    def memory_maps
+      msg = <<-EOF.gsub(/(?:^\s+\||\n)/, '')
+        |couldn't find /proc/#{@pid}/smaps; kernel < 2.6.14 or 
+        | CONFIG_MMU kernel configuration option is not enabled
+      EOF
+      raise NotImplementedError.new(msg)
+    end
+  end
   
   def name
     @name = File.new("/proc/#{@pid}/stat").readline.
@@ -218,6 +287,35 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     raise NotImplementedError.new("line not found")
   end
   
+  # data in pmmap_ext is an Array
+  def pmmap_ext(data)
+    pmmap_ext = ['addr', 'perms', 'path', 'rss', 'size', 'pss', 
+                 'shared_clean', 'shared_dirty', 'private_clean', 
+                 'private_dirty', 'referenced', 'anonymous', 'swap']
+    os_list = []
+    data.each do |datum|
+      os = OpenStruct.new
+      pmmap_ext.each_index {|i| os[pmmap_ext[i]] = datum[i]}
+      os_list.push(os)
+    end
+    os_list
+  end
+
+  # data in pmmap_grouped is a Hash
+  def pmmap_grouped(data)
+    pmmap_grouped = ['rss', 'size', 'pss', 'shared_clean', 
+                     'shared_dirty', 'private_clean', 'private_dirty', 
+                     'referenced', 'anonymous', 'swap']
+    os_list = []
+    data.each do |k, v|
+      os = OpenStruct.new
+      os.path = k
+      pmmap_grouped.each_index {|i| os[pmmap_grouped[i]] = v[i]}
+      os_list.push(os)
+    end
+    os_list
+  end
+
   def ppid
     IO.readlines("/proc/#{@pid}/status").each do |line|
       return line.split[1].to_i if line.start_with?("PPid:")

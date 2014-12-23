@@ -54,13 +54,13 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_memory_info_ex
+    memory_info = @process.memory_info
     memory_info_ex = @process.memory_info_ex
     assert_respond_to memory_info_ex, :shared
     assert_respond_to memory_info_ex, :text
     assert_respond_to memory_info_ex, :lib
     assert_respond_to memory_info_ex, :data
     assert_respond_to memory_info_ex, :dirty
-    memory_info = @process.memory_info
     assert_equal memory_info.vms, memory_info_ex.vms
     assert_equal memory_info.rss, memory_info_ex.rss
   end
@@ -88,6 +88,28 @@ class TestLinuxProcess < MiniTest::Test
     # the result is different from Thread.list.size, because
     # it shows the number of threads in system size instead of ruby size
     @process.num_threads
+  end
+
+  def test_pmmap_ext
+    maps = @process.memory_maps
+    ext = @process.pmmap_ext(maps)
+    pmmap_ext_items = ['addr', 'perms', 'path', 'rss', 'size', 'pss', 
+                 'shared_clean', 'shared_dirty', 'private_clean', 
+                 'private_dirty', 'referenced', 'anonymous', 'swap']
+    pmmap_ext_items.each do |item|
+      assert_respond_to ext[0], item.to_sym
+    end
+  end
+
+  def test_pmmap_grouped
+    maps = @process.memory_maps
+    ext = @process.pmmap_grouped(maps)
+    pmmap_grouped_items = ['path', 'rss', 'size', 'pss', 
+                 'shared_clean', 'shared_dirty', 'private_clean', 
+                 'private_dirty', 'referenced', 'anonymous', 'swap']
+    pmmap_grouped_items.each do |item|
+      assert_respond_to ext[0], item.to_sym
+    end
   end
 
   def test_ppid

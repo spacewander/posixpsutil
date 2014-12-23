@@ -137,6 +137,14 @@ class TestProcesses < MiniTest::Test
     # total memory should be cached after first called
     refute_equal nil, Processes.class_variable_get(:@@total_phymem)
   end
+
+  def test_memory_maps
+    maps = @process.memory_maps
+    no_groupby_maps = @process.memory_maps(false)
+    assert_equal maps.size, maps.uniq.size
+    assert_equal true, maps.size <= no_groupby_maps.size
+    assert_equal true, maps[0].size >= no_groupby_maps[0].size
+  end
 end
 
 class TestPlatformSpecificMethod < MiniTest::Test
