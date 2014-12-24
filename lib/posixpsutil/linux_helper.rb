@@ -21,6 +21,7 @@ module PsutilHelper
     def self.get_proc_inodes(pid)
       inodes = {}
       Dir.entries("/proc/#{pid}/fd").each do |fd|
+        next if fd == '.' || fd == '..'
         # get actual path
         begin
           inode = File.readlink("/proc/#{pid}/fd/#{fd}")
@@ -46,7 +47,7 @@ module PsutilHelper
       inodes = {}
       self.pids.each do |pid|
         begin
-          inodes.merge!(self.get_proc_inodes(pid))
+          inodes.merge!(self.get_proc_inodes(pid)){ |k, v1, v2| v1 + v2}
         rescue SystemCallError => e
           # Not Permission denied?
           raise unless [Errno::ENOENT::Errno, Errno::ESRCH::Errno, 
@@ -95,17 +96,35 @@ module PsutilHelper
     end
 
     # parse /proc/net/tcp[46] and /proc/net/udp[46]
-    def process_inet(fn, family, type, filter_inodes=[])
+    def process_inet(fn, family, type, inodes, filter_pid=nil)
+      # if IPv6 not supported
+      return [] if fn.end_with?('6') && !File.exists?(fn)
       f = File.new(fn)
       f.readline()
       ret = []
       f.readlines.each do |line|
         line = line.split(' ')
-        inode = line[9]
-        if filter_inodes.empty? || filter_inodes.include?(inode)
-          inet_list = {inode: inode.to_i, laddr: decode_address(line[1], family), 
-                       raddr: decode_address(line[2], family), family: family, 
-                       type: type, status: CONN_NONE}
+        inode = line[9].to_i
+        if inodes.key?(inode)
+          # We assume inet sockets are unique, so we error
+          # out if there are multiple references to the
+          # same inode. We won't do this for UNIX sockets.
+          if inodes[inode].size > 1
+            raise ArgumentError.new("ambiguos inode with multiple PIDs references")
+          end
+          pid, fd = inodes[inode][0]
+        else
+          #  set pid to nil and fd to -1 for those inodes without relative pid/fd. 
+          #  Mostly because Permission denied
+          pid, fd = nil, -1
+        end
+
+        if filter_pid.nil? || filter_pid == pid
+          inet_list = {
+            inode: inode, laddr: decode_address(line[1], family), 
+            raddr: decode_address(line[2], family), family: family, 
+            type: type, status: CONN_NONE, pid: pid, fd: fd
+          }
           inet_list[:status] = TCP_STATUSES[line[3]] if type == SOCK_STREAM
           inet_list = OpenStruct.new inet_list
           ret.push(inet_list)
@@ -115,20 +134,33 @@ module PsutilHelper
     end
 
     # parse /proc/net/unix 
-    def process_unix(fn, family, filter_inodes=[])
+    def process_unix(fn, family, inodes, filter_pid=nil)
       f = File.new(fn)
       f.readline()
       ret = []
       f.readlines.each do |line|
         line = line.split(' ')
-        inode = line[6]
-        if filter_inodes.empty? || filter_inodes.include?(inode)
-          inet_list = {inode: inode.to_i, raddr: nil, family: family, 
-                       type: line[4].to_i, status: CONN_NONE, path: ''}
-          inet_list[:path] = line[-1] if line.size == 8
-          inet_list = OpenStruct.new inet_list
-          ret.push(inet_list)
-        end # if inode included
+        inode = line[6].to_i
+        #  set pid to nil and fd to -1 for those inodes without relative pid/fd. 
+        #  Mostly because Permission denied
+        if inodes.key?(inode)
+          pairs = inodes[inode]
+        else
+          pairs = [[nil, -1]]
+        end
+
+        pairs.each do |pid, fd|
+          if filter_pid.nil? || filter_pid == pid
+            inet_list = {
+              inode: inode, raddr: nil, family: family, type: line[4].to_i, 
+              status: CONN_NONE, laddr: '', fd: fd, pid: pid
+            }
+            inet_list[:laddr] = line[-1] if line.size == 8
+            inet_list = OpenStruct.new inet_list
+            ret.push(inet_list)
+          end # if inode included
+        end
+
       end # each lines
       ret
     end
@@ -148,7 +180,7 @@ module PsutilHelper
       ip, port = addr.split(':')
       # this usually refers to a local socket in listen mode with
       # no end-points connected
-      return nil if !port || port == '0000'
+      return [] if !port || port == '0000'
       # convert /proc style ip and port 
       # to addrinfo string according to family and endian
       if '\x00\x01'.unpack('S') == '\x00\x01'.unpack('S<') # little endian

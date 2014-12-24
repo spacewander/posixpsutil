@@ -423,22 +423,14 @@ class Network
     ret = []
     connection = Connection.new
     return nil unless connection.tmap.key?(interface)
+    inodes = Processes.get_all_inodes
     connection.tmap[interface].each do |kind|
       f, family, type = kind
       if [AF_INET, AF_INET6].include?(family)
-        ret.concat(connection.process_inet("/proc/net/#{f}", family, type))
+        ret.concat(connection.process_inet("/proc/net/#{f}", family, 
+                                           type, inodes))
       else
-        ret.concat(connection.process_unix("/proc/net/#{f}", family, type))
-      end
-    end
-    inodes = Processes.get_all_inodes
-    #  set pid to nil and fd to -1 for those inodes without relative pid/fd. 
-    #  Mostly because Permission denied
-    ret.each do |conn|
-      if inodes.has_key? conn.inode
-        conn.pid, conn.fd = inodes[conn.inode].first
-      else
-        conn.pid, conn.fd = nil, -1
+        ret.concat(connection.process_unix("/proc/net/#{f}", family, inodes))
       end
     end
     ret

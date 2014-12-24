@@ -19,6 +19,9 @@ PAGE_SIZE = COMMON::PAGE_SIZE
 CLOCK_TICKS = COMMON::CLOCK_TICKS
 
 class PlatformSpecificProcess < PsutilHelper::Processes
+  include PsutilHelper
+  include NetworkConstance
+
   # for class scope variable which should be memorized
   @@terminal_map = {}
   @@boot_time = nil
@@ -37,9 +40,9 @@ class PlatformSpecificProcess < PsutilHelper::Processes
       begin
         old_method.bind(self).call(*args, &block)
       rescue Errno::ENOENT, Errno::ESRCH
-        raise NoSuchProcess.new(pid:@pid)
+        raise NoSuchProcess.new(pid:@pid, name:@name)
       rescue Errno::EPERM, Errno::EACCES
-        raise AccessDenied
+        raise AccessDenied.new(pid: @pid, name:@name)
       end
     end
   end
@@ -64,6 +67,28 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     values = st.split(' ')
     @@boot_time = PsutilHelper::boot_time() if @@boot_time.nil?
     return @@boot_time + values[19].to_f / CLOCK_TICKS
+  end
+
+  def connections(interface = :inet)
+    connection = Connection.new
+    unless connection.tmap.key?(interface)
+      raise ArgumentError.new("Unknown connection kind #{interface}") 
+    end
+    inodes = Processes.get_proc_inodes(@pid)
+    return [] if inodes.empty?
+
+    ret = []
+    connection.tmap[interface].each do |kind|
+      f, family, type = kind
+      if [AF_INET, AF_INET6].include?(family)
+        ret.concat(connection.process_inet("/proc/net/#{f}", 
+                                           family, type, inodes, @pid))
+      else
+        ret.concat(connection.process_unix("/proc/net/#{f}", 
+                                           family, inodes, @pid))
+      end
+    end
+    ret.each { |conn| conn.delete_field(:pid) }
   end
 
   def cwd
@@ -97,7 +122,7 @@ class PlatformSpecificProcess < PsutilHelper::Processes
       if File.exists? "/proc/#{@pid}"
         return ""
       else
-        raise NoSuchProcess(pid:@pid, name:name())
+        raise NoSuchProcess.new(pid:@pid)
       end
       raise
     rescue Errno::EPERM, Errno::EACCES
@@ -286,6 +311,31 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     end
     raise NotImplementedError.new("line not found")
   end
+
+  def open_files
+    retlist = []
+    Dir.entries("/proc/#{@pid}/fd").each do |fd|
+      next if fd == '.' || fd == '..'
+      file = "/proc/#{@pid}/fd/#{fd}"
+      if File.symlink?(file)
+        begin
+          file = File.readlink(file)
+        rescue Errno::ENOENT, Errno::ESRCH
+          # raise NSP if the process disappeared on us
+          next if File.exist?("/proc/#{@pid}")
+        end
+        # If file is not an absolute path there's no way
+        # to tell whether it's a regular file or not,
+        # so we skip it. A regular file is always supposed
+        # to be absolutized though.
+        if file.start_with?('/') && File.file?(file) # regular file only
+          retlist.push(OpenStruct.new(path: file, fd: fd.to_i))
+        end
+      end
+    end
+
+    retlist
+  end
   
   # data in pmmap_ext is an Array
   def pmmap_ext(data)
@@ -374,6 +424,18 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     # impossible to reach here
     raise NotImplementedError.new('line not found')
   end
+
+  # assert the process is existed when specific method called
+  def self.assert_process_exists(method)
+    old_method = instance_method(method)
+    define_method method do |*args, &block|
+      file = "/proc/#{@pid}"
+      # raise NSP if the process disappeared on us
+      raise NoSuchProcess.new(pid: @pid) unless File.exists?(file)
+      old_method.bind(self).call(*args, &block)
+    end
+  end
+  assert_process_exists :connections
 
   def self.wrap_action_except_for(wrapper, methods)
     methods = self.instance_methods(false) - methods

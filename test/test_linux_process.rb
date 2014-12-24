@@ -1,4 +1,5 @@
 require 'minitest/autorun'
+require 'socket'
 require 'posixpsutil/linux_process'
 
 class TestLinuxProcess < MiniTest::Test
@@ -14,12 +15,38 @@ class TestLinuxProcess < MiniTest::Test
     assert_equal '-Ilib:lib:test', @process.cmdline()[1]
   end
 
+  def test_connections
+    Socket.pair(:UNIX, :STREAM, 0)
+    connections = @process.connections(:all)
+    assert_equal 2, connections.size
+    assert_equal 0, @process.connections(:inet).size
+    assert_equal 2, @process.connections(:unix).size
+    refute_respond_to connections[0], :pid
+    assert_respond_to connections[0], :fd
+    assert_respond_to connections[0], :family
+    assert_respond_to connections[0], :type
+    assert_respond_to connections[0], :laddr
+    assert_respond_to connections[0], :raddr
+    assert_respond_to connections[0], :status
+  end
+
+  def test_connections_for_inet
+    # ping www.bing.com to create a tcp connection
+    Socket.tcp("www.bing.com", 80) {|sock|
+      assert_equal 1, @process.connections(:inet).size
+    }
+  end
+
+  def test_connections_if_interface_not_supported
+    assert_raises ArgumentError do
+      @process.connections('inet')
+    end
+  end
+
   def test_cpu_times
     cpu_times = @process.cpu_times
-    assert_in_delta Process.times.utime, cpu_times.user, 
-      Process.times.utime * THRESHOLD
-    assert_in_delta Process.times.stime, cpu_times.system, 
-      Process.times.stime * THRESHOLD
+    assert_in_delta Process.times.utime, cpu_times.user, 0.01
+    assert_in_delta Process.times.stime, cpu_times.system, 0.01
   end
 
   def test_create_time
@@ -68,7 +95,7 @@ class TestLinuxProcess < MiniTest::Test
     assert_respond_to memory_info_ex, :dirty
     assert_in_delta memory_info.vms, memory_info_ex.vms, 
       memory_info_ex.vms * THRESHOLD
-    assert_equal memory_info.rss, memory_info_ex.rss, 
+    assert_in_delta memory_info.rss, memory_info_ex.rss, 
       memory_info_ex.rss * THRESHOLD
   end
 
@@ -95,6 +122,10 @@ class TestLinuxProcess < MiniTest::Test
     # the result is different from Thread.list.size, because
     # it shows the number of threads in system size instead of ruby size
     @process.num_threads
+  end
+
+  def test_open_files
+    @process.open_files
   end
 
   def test_pmmap_ext
@@ -165,10 +196,16 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
       PlatformSpecificProcess.new(1).exe()
     end
   end
-
+  
   def test_exe_no_such_process
     assert_raises NoSuchProcess do
       PlatformSpecificProcess.new(99999).exe()
+    end
+  end
+
+  def test_assert_process_exists
+    assert_raises NoSuchProcess do
+      PlatformSpecificProcess.new(99999).connections()
     end
   end
 

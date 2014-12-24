@@ -338,7 +338,7 @@ class Processes
   end
 
   def nice=(value)
-    raise NoSuchProcess.new(pid:@pid, name:@name) unless is_running()
+    raise NoSuchProcess.new(pid:@pid) unless is_running()
     @proc.nice = value
   end
 
@@ -637,11 +637,39 @@ class Processes
     end
   end
 
+  # Return regular files opened by process as a list of
+  # <#OpenStruct path, fd> including the absolute file name
+  # and file descriptor number.
+  def open_files
+    @proc.open_files
+  end
+
+  # Return connections opened by process as a list of
+  # #<OpenStruct fd, family, type, laddr, raddr, status>
+  # The 'kind' parameter filters for connections that match the
+  # following criteria:
+  #
+  # Kind Value      Connections using
+  # :inet            IPv4 and IPv6
+  # :inet4           IPv4
+  # :inet6           IPv6
+  # :tcp             TCP
+  # :tcp4            TCP over IPv4
+  # :tcp6            TCP over IPv6
+  # :udp             UDP
+  # :udp4            UDP over IPv4
+  # :udp6            UDP over IPv6
+  # :unix            UNIX socket (both UDP and TCP protocols)
+  # :all             the sum of all the possible families and protocols
+  def connections(interface = :inet)
+    @proc.connections(interface)
+  end
+  
   def self.assert_pid_not_reused(methods)
     methods.each do |method|
       old_method = instance_method(method)
       define_method method do |*args, &block|
-        raise NoSuchProcess(pid: @pid, name: name()) unless is_running
+        raise NoSuchProcess(pid: @pid) unless is_running
         old_method.bind(self).call(*args, &block)
       end
     end
