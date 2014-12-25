@@ -18,37 +18,38 @@ end
 
 # As there is a Process Module in ruby, I change the name to Processes
 class Processes
-   # Represents an OS process with the given PID.
-   # If PID is omitted current process PID (Process.pid) is used.
-   # Raise NoSuchProcess if PID does not exist.
-   #
-   # Note that most of the methods of this class do not make sure
-   # the PID of the process being queried has been reused over time.
-   # That means you might end up retrieving an information referring
-   # to another process in case the original one this instance
-   # refers to is gone in the meantime.
-   #
-   # The only exceptions for which process identity is pre-emptively
-   # checked and guaranteed are:
+  # Represents an OS process with the given PID.
+  # If PID is omitted current process PID (Process.pid) is used.
+  # Raise NoSuchProcess if PID does not exist.
+  #
+  # Note that most of the methods of this class do not make sure
+  # the PID of the process being queried has been reused over time.
+  # That means you might end up retrieving an information referring
+  # to another process in case the original one this instance
+  # refers to is gone in the meantime.
+  #
+  # The only exceptions for which process identity is pre-emptively
+  # checked and guaranteed are:
+  #
+  #  - parent()
+  #  - children()
+  #  - nice() (set)
+  #  - ionice() (set)
+  #  - rlimit() (set)
+  #  - cpu_affinity (set)
+  #  - suspend()
+  #  - resume()
+  #  - send_signal()
+  #  - terminate()
+  #  - kill()
+  #
+  # To prevent this problem for all other methods you can:
+  #   - use is_running() before querying the process
+  #   - if you're continuously iterating over a set of Process
+  #     instances use process_iter() which pre-emptively checks
+  #     process identity for every instance
+  include POSIX
 
-   #  - parent()
-   #  - children()
-   #  - nice() (set)
-   #  - ionice() (set)
-   #  - rlimit() (set)
-   #  - cpu_affinity (set)
-   #  - suspend()
-   #  - resume()
-   #  - send_signal()
-   #  - terminate()
-   #  - kill()
-
-   # To prevent this problem for all other methods you can:
-   #   - use is_running() before querying the process
-   #   - if you're continuously iterating over a set of Process
-   #     instances use process_iter() which pre-emptively checks
-   #     process identity for every instance
-  
   attr_reader :identity
   attr_reader :pid
 
@@ -59,11 +60,10 @@ class Processes
     PlatformSpecificProcess.pids()
   end
 
-  # Return True if given PID exists in the current process list.
+  # Return true if given PID exists in the current process list.
   # This is faster than doing "pid in psutil.pids()" and
   # should be preferred.
   def self.pid_exists(pid)
-    return false if pid < 0
     POSIX::pid_exists(pid)
   end
 
@@ -125,7 +125,7 @@ class Processes
       # limited user
     rescue NoSuchProcess
       msg = "no process found with pid #{@pid}"
-      raise NoSuchProcess(pid:@pid, msg:msg)
+      raise NoSuchProcess.new(pid:@pid, msg:msg)
     end
     # This part is supposed to indentify a Process instance
     # univocally over time (the PID alone is not enough as
@@ -173,14 +173,18 @@ class Processes
   # 'default' is the value which gets assigned in case
   # AccessDenied  exception is raised when retrieving that
   # particular process information.
-  def to_hash(given_attrs=[], default={})
+  def to_hash(given_attrs = nil, default = {})
     # psutil defines some excluded methods, they won't be accessed via
     # this method.
     #
     # psutil want to warn us that the process with given pid may gone,
     # as the comment at the head of the class says.
-    excluded_names = [:identity, :to_s, :inspect, :==, :eql?, 
-                      :!=, :to_hash, :parent, :is_running, :children, :rlimit]
+    excluded_names = [
+      :identity, :to_s, :inspect, :==, :eql?, :!=, :to_hash, :parent, 
+      :is_running, :children, :rlimit, :send_signal, :kill, :terminate, 
+      :resume, :suspend, :wait
+    ]
+
 
     respond_to_methods = self.public_methods(false)
     included_names = respond_to_methods - excluded_names
@@ -366,7 +370,7 @@ class Processes
     if timeout && timeout < 0
       raise ArgumentError.new("timeout must be a positive integer") 
     end
-    return POSIX::wait_pid(@pid, timeout)
+    return wait_pid(@pid, timeout)
     # maybe raise Timeout::Error, need not to convert it currently
     #rescue Timeout::Error
   end
@@ -609,7 +613,7 @@ class Processes
     rss = @proc.memory_info.rss
     @@total_phymem = Memory.virtual_memory.total if @@total_phymem.nil?
     begin
-      return (rss / @@total_phymem.to_f) * 100
+      return (rss / @@total_phymem.to_f * 100).round(2)
     rescue ZeroDivisionError
       return 0.0
     end
@@ -729,6 +733,7 @@ class Processes
       end
     end
   end
+  private_class_method :assert_pid_not_reused
 
   assert_pid_not_reused [:children, :send_signal, :suspend, :resume, 
                          :terminate, :kill]

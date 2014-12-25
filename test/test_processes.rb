@@ -1,5 +1,6 @@
 require 'minitest/autorun'
 require 'posixpsutil/processes'
+require 'timeout'
 
 class TestPsutilError < MiniTest::Test
    def test_access_denied
@@ -162,6 +163,12 @@ class TestProcesses < MiniTest::Test
     Signal.trap("CONT", old_cont_handler)
     assert_equal true, hasTerminated
     assert_equal true, hasResumed
+  end
+
+  def test_wait_with_timeout
+    assert_raises Timeout::Error do
+      @process.wait(0.1)
+    end
   end
 
 end

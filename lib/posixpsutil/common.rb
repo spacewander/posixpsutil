@@ -81,6 +81,7 @@ module POSIX
 
 # Check whether pid exists in the current process table."""
 def pid_exists(pid)
+  return false if pid < 0
   # According to "man 2 kill" PID 0 has a special meaning:
   # it refers to <<every process in the process group of the
   # calling process>> so we don't want to go any further.
@@ -110,6 +111,7 @@ module_function :pid_exists
 #
 # Raise Timeout::Error on timeout expired.
 def wait_pid(pid, timeout=nil)
+
   def check_timeout(delay, stop_at, timeout)
     if timeout
       raise Timeout::Error if Time.now >= stop_at
