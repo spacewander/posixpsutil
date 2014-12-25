@@ -362,7 +362,10 @@ class Processes
     @proc.num_fds
   end
 
-  def wait(timeout=nil)
+  def wait(timeout = nil)
+    if timeout && timeout < 0
+      raise ArgumentError.new("timeout must be a positive integer") 
+    end
     return POSIX::wait_pid(@pid, timeout)
     # maybe raise Timeout::Error, need not to convert it currently
     #rescue Timeout::Error
@@ -665,6 +668,58 @@ class Processes
     @proc.connections(interface)
   end
   
+  # Send a signal to process pre-emptively checking whether
+  # PID has been reused (see signal module constants) .
+  # 
+  # signal may be an integer signal number or a POSIX signal name 
+  # (either with or without a SIG prefix). 
+  # For example, 'SIGSTOP'/'STOP'/19 all means the signal SIGSTOP
+  # 
+  # According to Ruby doc, 
+  # > If signal is negative (or starts with a minus sign), 
+  # > kills process groups instead of processes
+  # 
+  # Currently I consider it as a feature and will not change this behaviour
+  def send_signal(sig)
+    begin
+      # according to "man 2 kill" , PID 0 refers to 
+      # 'every process in the process group of the calling process'
+      # Luckily, @pid is >= 0
+      Process.kill(sig, @pid)
+    rescue Errno::ESRCH
+      @gone = true
+      raise NoSuchProcess(@pid, @name)
+    rescue Errno::EPERM
+      raise AccessDenied(@pid, @name)
+    end
+  end
+
+  # Suspend process execution with SIGSTOP pre-emptively checking
+  # whether PID has been reused.
+  def suspend
+    send_signal('STOP')
+  end
+
+  # Resume process execution with SIGCONT pre-emptively checking
+  # whether PID has been reused.
+  def resume
+    send_signal('CONT')
+  end
+
+  # Terminate process execution with SIGTERM pre-emptively checking
+  # whether PID has been reused.
+  def terminate
+    send_signal('TERM')
+  end
+
+  # Kill the current process with SIGKILL pre-emptively checking
+  # whether PID has been reused.
+  #
+  # It is not an alias_method of send_signal
+  def kill
+    send_signal('KILL')
+  end
+
   def self.assert_pid_not_reused(methods)
     methods.each do |method|
       old_method = instance_method(method)
@@ -675,7 +730,8 @@ class Processes
     end
   end
 
-  assert_pid_not_reused [:children]
+  assert_pid_not_reused [:children, :send_signal, :suspend, :resume, 
+                         :terminate, :kill]
 
 end
 

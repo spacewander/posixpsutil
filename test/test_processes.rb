@@ -145,6 +145,25 @@ class TestProcesses < MiniTest::Test
     assert_equal true, maps.size <= no_groupby_maps.size
     assert_equal true, maps[0].size >= no_groupby_maps[0].size
   end
+
+  def test_send_signal
+    hasTerminated = false
+    hasResumed = false
+    old_term_handler = Signal.trap("TERM") do
+      hasTerminated = true
+    end
+    old_cont_handler = Signal.trap("CONT") do
+      hasResumed = true
+    end
+
+    @process.terminate
+    @process.resume
+    Signal.trap("TERM", old_term_handler)
+    Signal.trap("CONT", old_cont_handler)
+    assert_equal true, hasTerminated
+    assert_equal true, hasResumed
+  end
+
 end
 
 class TestPlatformSpecificMethod < MiniTest::Test
