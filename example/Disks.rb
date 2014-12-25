@@ -3,11 +3,11 @@
 
 require_relative '../lib/posixpsutil'
 
-disk_parititions = Disks.disk_partitions
+disk_partitions = Disks.disk_partitions
 puts "There are #{disk_partitions.size} devices"
 puts "The first device: #{disk_partitions[0].device}"
 puts "Its mountpoint: #{disk_partitions[0].mountpoint}"
-puts "Its filesystem: #{disk_parititions[0].fstype}"
+puts "Its filesystem: #{disk_partitions[0].fstype}"
 puts "Its options: #{disk_partitions[0].opts}"
 
 puts ""
