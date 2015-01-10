@@ -46,7 +46,7 @@ class Processes
   # To prevent this problem for all other methods you can:
   #   - use is_running() before querying the process
   #   - if you're continuously iterating over a set of Process
-  #     instances use process_iter() which pre-emptively checks
+  #     instances use process_iter() or processes() which pre-emptively checks
   #     process identity for every instance
   include POSIX
 
@@ -79,7 +79,7 @@ class Processes
   # safe in case a PID has been reused by another process, in which
   # case the cached instance is updated.
   #
-  def self.process_iter
+  def self.processes
     pre_pids = @@pmap.keys
     cur_pids = pids()
     gone_pids = pre_pids - cur_pids
@@ -102,6 +102,26 @@ class Processes
     @@pmap.values
   end
 
+  # Like self.processes(), but return next Processes instance in each iteration.
+  # To imitate Python's iterator, use Enumerator to implement this method, which
+  # means it will raise StopIteration when it reaches the end.
+  def self.process_iter
+    processes = []
+    pids().each do |pid|
+      begin
+        unless @@pmap.key?(pid) && @@pmap[pid].is_running
+          p = Processes.new(pid)
+          @@pmap[p.pid] = p
+        end
+        processes.push @@pmap[pid]
+      rescue NoSuchProcess
+        @@pmap.delete(pid)
+      rescue AccessDenied
+        next
+      end
+    end
+    processes.to_enum
+  end
   
   # instance methods
   def initialize(pid=nil)
@@ -464,7 +484,7 @@ class Processes
       # construct a hash where 'values'(an Array) are all the processes
       # having 'key' as their parent
       table = {}
-      self.class.process_iter().each do |p|
+      self.class.processes.each do |p|
         begin
           ppid = p.ppid
           (table.key? ppid)? table[ppid].push(p) : table[ppid] = [p]
@@ -496,7 +516,7 @@ class Processes
       end
 
     else
-      self.class.process_iter().each do |p|
+      self.class.processes().each do |p|
         begin
           ret.push(p) if p.ppid == @pid && create_time() <= p.create_time()
         rescue NoSuchProcess

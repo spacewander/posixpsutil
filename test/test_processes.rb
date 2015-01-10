@@ -228,12 +228,19 @@ class TestProcessesClassMethods < MiniTest::Test
     assert_equal true, Processes.pid_exists(1)
   end
 
-  def test_process_iter
-    process_iter = Processes.process_iter
-    assert_equal true, process_iter.include?(Processes.new(Process.pid))
-    assert_equal true, process_iter.include?(Processes.new(1))
-    # process_iter should cache processes in @@pmap
+  def test_processes
+    processes = Processes.processes
+    assert_equal true, processes.include?(Processes.new(Process.pid))
+    assert_equal true, processes.include?(Processes.new(1))
+    # processes() should cache processes in @@pmap
     pmap = Processes.class_variable_get(:@@pmap)
-    assert_equal true, process_iter.size == pmap.size
+    assert_equal true, processes.size == pmap.size
   end 
+
+  def test_process_iter
+    iter = Processes.process_iter
+    assert_equal Processes.new(1), iter.next
+    3.times { iter.next }
+    assert_equal Processes.processes[4], iter.next
+  end
 end
