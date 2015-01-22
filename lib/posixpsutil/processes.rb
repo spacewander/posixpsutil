@@ -351,6 +351,11 @@ class Processes
     @create_time
   end
 
+  # Return the wall time cost by process, measured in seconds
+  def time_used
+    @proc.time_used
+  end
+
   # Process current working directory as an absolute path.
   def cwd
     @proc.cwd
@@ -607,10 +612,6 @@ class Processes
       # interval was too low
       return 0.0
     end
-  end
-
-  def cpu_times
-    @proc.cpu_times
   end
 
   # Return an OpenStruct representing RSS (Resident Set Size) and VMS

@@ -53,6 +53,11 @@ class TestLinuxProcess < MiniTest::Test
     assert_equal true, @process.create_time() < Time.now.to_f
   end
 
+  def test_time_used
+    former_process_time_used = @process.time_used()
+    assert_equal true, @process.time_used() >= former_process_time_used
+  end
+
   def test_cwd
     assert_equal Dir.pwd, @process.cwd()
   end

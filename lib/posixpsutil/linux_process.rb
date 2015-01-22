@@ -62,11 +62,18 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def create_time
-    st = IO.read("/proc/#{@pid}/stat").strip
-    st = st[/\) (.*$)/, 1]
-    values = st.split(' ')
-    @@boot_time = PsutilHelper::boot_time() if @@boot_time.nil?
-    return @@boot_time + values[19].to_f / CLOCK_TICKS
+    if @create_time.nil?
+      st = IO.read("/proc/#{@pid}/stat").strip
+      st = st[/\) (.*$)/, 1]
+      values = st.split(' ')
+      @@boot_time = PsutilHelper::boot_time() if @@boot_time.nil?
+      @create_time =  @@boot_time + values[19].to_f / CLOCK_TICKS
+    end
+    @create_time
+  end
+
+  def time_used
+    (Time.now.to_f - create_time).round 2
   end
 
   def connections(interface = :inet)
