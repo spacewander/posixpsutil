@@ -1,0 +1,4 @@
+CC := gcc
+LDLIBS := -shared
+CCFLAGS := -MP -MMD -Wall
+

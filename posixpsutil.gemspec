@@ -15,5 +15,5 @@ Gem::Specification.new do |s|
   s.files       = Dir["lib/**/*"] + ["README.md", "Rakefile"]
   s.test_files  = Dir["test/*"]
   s.license     = 'new BSD'
-
+  s.add_dependency 'ffi'
 end

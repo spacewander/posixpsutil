@@ -1,0 +1,16 @@
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) $(LDLIBS) -o $(TARGET)
+
+%.o : %.c
+	$(CC) -fPIC -c $(CCFLAGS) $< -o $@
+
+-include $(DEPS)
+
+clean:
+	rm -rf $(OBJS) $(DEPS) $(TARGET)
+
+install: $(TARGET)
+	rm -rf **/*.o **/*.d
+
+.PHONY: clean install
+
