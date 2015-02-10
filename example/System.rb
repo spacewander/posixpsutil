@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+puts "Start running the System example"
 puts "Users detail :"
 puts "There are #{System.users.size} users"
 user = System.users[0]
@@ -12,4 +13,5 @@ puts "The host is #{user.host}"
 puts "And has started for #{user.started}"
 
 puts "System boot time is #{System.boot_time()}"
+puts ""
 

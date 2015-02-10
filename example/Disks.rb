@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+puts "Start running the Disks example"
 disk_partitions = Disks.disk_partitions
 puts "There are #{disk_partitions.size} devices"
 puts "The first device: #{disk_partitions[0].device}"
@@ -36,4 +37,5 @@ puts ""
 puts "Disk IO counters(total) : #{Disks.disk_io_counters(false)}"
 puts "Disk IO counters(perdisk) : "
 Disks.disk_io_counters().each_pair {|name, disk| puts "#{name} : #{disk}"}
+puts ""
 

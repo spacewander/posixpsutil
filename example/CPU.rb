@@ -18,4 +18,6 @@ def show_cpu()
 
 end
 
+puts "Start running the CPU example"
 show_cpu()
+puts ""

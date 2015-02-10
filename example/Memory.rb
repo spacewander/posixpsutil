@@ -3,6 +3,7 @@
 
 require_relative "../lib/posixpsutil"
 
+puts "Start running the Memory example"
 puts "Virtual memory info:"
 puts "Total: #{Memory.virtual_memory.total}"
 puts "Available: #{Memory.virtual_memory.available}"
@@ -22,4 +23,5 @@ puts "Free: #{Memory.swap_memory.free}"
 puts "Percent: #{Memory.swap_memory.percent}"
 puts "Sin: #{Memory.swap_memory.sin}"
 puts "Sout: #{Memory.swap_memory.sout}"
+puts ""
 

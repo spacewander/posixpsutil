@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+puts "Start running the Processes example"
 p = Processes.new()
 puts "Currently Processes Module support those class methods:"
 Processes.public_methods(false).each { |method| puts method }
@@ -34,3 +35,4 @@ attrs = p.to_hash
 attrs.each do |k, v|
   puts "#{k} : #{v}"
 end
+puts ""

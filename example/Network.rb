@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+puts "Start running the Network example"
 puts "Net io counter for eth0 :"
 netios = Network.net_io_counters(true)
 netio = netios[:eth0]
@@ -37,4 +38,5 @@ Network.net_connections().each do |conn|
   print "Status: #{conn.status} "
   print "Pid: #{conn.pid}\n"
 end
+puts ""
 
