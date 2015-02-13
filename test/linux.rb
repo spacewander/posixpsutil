@@ -1,8 +1,9 @@
-require 'minitest/autorun'
 require 'posixpsutil'
 
 # bytes tolerance for OS memory related tests
 TOLERANCE = 500 * 1024 # 500KB
+
+include PosixPsutil
 
 class TestCPU < MiniTest::Test
   CPU.cpu_count

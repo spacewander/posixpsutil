@@ -1,6 +1,8 @@
 require 'minitest/autorun'
 require 'posixpsutil/common'
 
+include PosixPsutil
+
 class TestPOSIX < MiniTest::Test
   include POSIX
 

@@ -2,7 +2,13 @@ require 'socket'
 require 'timeout'
 require_relative 'psutil_error'
 
+module PosixPsutil
 module COMMON
+
+LINUX_PLATFORM = /linux/i
+NON_LINUX_PLATFORM = /darwin|mac os|solaris|bsd|aix/i
+OSX_PLAFORM = /darwin|mac os/i
+NON_OSX_PLATFORM = /linux|solaris|bsd|aix/i
 
 # CLOCK_TICKS = 100
 CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
@@ -35,7 +41,7 @@ def self.usage_percent(used, total, _round=nil)
       return ret
   end
 end
-  
+
 end
 
 module NetworkConstance
@@ -89,7 +95,7 @@ def pid_exists(pid)
   # a process with id 0.
   return true if pid == 0
 
-  Process.kill(0, pid)
+  ::Process.kill(0, pid)
   return true
   rescue Errno::ESRCH # No such process
     return false
@@ -121,10 +127,10 @@ def wait_pid(pid, timeout=nil)
   end
 
   if timeout
-    waitcall = proc { Process.wait(pid, Process::WNOHANG)}
+    waitcall = proc { ::Process.wait(pid, ::Process::WNOHANG)}
     stop_at = Time.now + timeout
   else
-    waitcall = proc { Process.wait(pid)}
+    waitcall = proc { ::Process.wait(pid)}
   end
 
   delay = 0.0001
@@ -168,4 +174,5 @@ def wait_pid(pid, timeout=nil)
   end
 end
 
+end
 end

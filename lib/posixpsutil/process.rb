@@ -6,18 +6,24 @@ require_relative 'common'
 
 os = RbConfig::CONFIG['host_os']
 case os
-  when /darwin|mac os|solaris|bsd/
-    require_relative 'posix_process'
-  when /linux/
-    require_relative 'linux_process'
-    require_relative 'linux'
+  when PosixPsutil::COMMON::NON_LINUX_PLATFORM
+    require_relative 'posix/process'
+    # some modules in system.rb, like Memory, are in need, so require them here
+    require_relative 'posix/system'
+  when PosixPsutil::COMMON::LINUX_PLATFORM
+    require_relative 'linux/process'
+    require_relative 'linux/system'
   else
-    raise RuntimeError, "unknown os: #{os.inspect}"
+    raise RuntimeError, "unsupported os: #{os.inspect}"
 end
 
 
-# As there is a Process Module in ruby, I change the name to Processes
-class Processes
+module PosixPsutil
+
+# Warning: There is already a Process module in ruby, so don't confuse it with 
+# this PosixPsutil::Process. And take care of `include PosixPsutil`, unless you 
+# have clearly considered about it.
+class Process
   # Represents an OS process with the given PID.
   # If PID is omitted current process PID (Process.pid) is used.
   # Raise NoSuchProcess if PID does not exist.
@@ -69,10 +75,10 @@ class Processes
 
   @@pmap = {}
 
-  # Return all Processes instances for all
+  # Return all Process instances for all
   # running processes.
   #
-  # Every new Processes instance is only created once and then cached
+  # Every new Process instance is only created once and then cached
   # into an internal table which is updated every time this is used.
   #
   # Cached Process instances are checked for identity so that you're
@@ -88,7 +94,7 @@ class Processes
     cur_pids.each do |pid|
       begin
         unless @@pmap.key?(pid) && @@pmap[pid].is_running
-          p = Processes.new(pid)
+          p = Process.new(pid)
           @@pmap[p.pid] = p
         end
       rescue NoSuchProcess
@@ -102,7 +108,7 @@ class Processes
     @@pmap.values
   end
 
-  # Like self.processes(), but return next Processes instance in each iteration.
+  # Like self.processes(), but return next Process instance in each iteration.
   # To imitate Python's iterator, use Enumerator to implement this method, which
   # means it will raise StopIteration when it reaches the end.
   def self.process_iter
@@ -110,7 +116,7 @@ class Processes
     pids().each do |pid|
       begin
         unless @@pmap.key?(pid) && @@pmap[pid].is_running
-          p = Processes.new(pid)
+          p = Process.new(pid)
           @@pmap[p.pid] = p
         end
         processes.push @@pmap[pid]
@@ -125,7 +131,7 @@ class Processes
   
   # instance methods
   def initialize(pid=nil)
-    pid = Process.pid unless pid
+    pid = ::Process.pid unless pid
     @pid = pid
     raise ArgumentError.new("pid must be 
                             a positive integer (got #{@pid})") if @pid <= 0
@@ -230,14 +236,14 @@ class Processes
     ret
   end
 
-  # Return the parent process as a Processes object pre-emptively
+  # Return the parent process as a Process object pre-emptively
   # checking whether PID has been reused.
   # If no parent is known return nil.
   def parent
     ppid = ppid()
     if ppid 
       begin
-        parent = Processes.new ppid
+        parent = Process.new ppid
         return parent if parent.create_time() <= create_time()
       rescue NoSuchProcess
         # ignore ...
@@ -252,7 +258,7 @@ class Processes
   def is_running
     return false if @gone
     begin
-      return self == Processes.new(@pid)
+      return self == Process.new(@pid)
     rescue NoSuchProcess
       @gone = true
       return false
@@ -326,8 +332,7 @@ class Processes
   
   # The name of the user that owns the process.
   def username
-    # the uid got from Process Module is real uid yet
-    real_uid = Process.uid
+    real_uid = uids[:real]
     begin
       return Etc::getpwuid(real_uid).name
     rescue ArgumentError
@@ -478,7 +483,7 @@ class Processes
   #    └─ D (child)
 
   # require 'posixpsutil'
-  # p = Processes.new()
+  # p = Process.new()
   # p.children()
   # # B, C, D
   # p.children(true)
@@ -552,7 +557,7 @@ class Processes
   #
   #   require 'posixpsutil'
   #
-  #   p = Processes.new(Process.pid)
+  #   p = Process.new(Process.pid)
   #   # blocking
   #   p.cpu_percent(1)
   #   # 2.0
@@ -561,7 +566,7 @@ class Processes
   #   p.cpu_percent
   #   # 2.9
   #   
-  #   p = Processes.new(4527)
+  #   p = Process.new(4527)
   #   # first called
   #   p.cpu_percent
   #   # 0.0
@@ -710,7 +715,7 @@ class Processes
       # according to "man 2 kill" , PID 0 refers to 
       # 'every process in the process group of the calling process'
       # Luckily, @pid is >= 0
-      Process.kill(sig, @pid)
+      ::Process.kill(sig, @pid)
     rescue Errno::ESRCH
       @gone = true
       raise NoSuchProcess(@pid, @name)
@@ -760,4 +765,4 @@ class Processes
                          :terminate, :kill]
 
 end
-
+end

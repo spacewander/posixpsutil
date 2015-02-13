@@ -1,8 +1,11 @@
 require 'ipaddr'
 require 'ostruct'
-require_relative './common'
+require_relative '../common'
 
-# this module places all classes can be used both in Processes and in other modules
+module PosixPsutil
+
+# This module places all classes can be used both in Process and in other modules.
+# Each platform has its own PsutilHelper module.
 module PsutilHelper
 
   def self.boot_time
@@ -11,6 +14,8 @@ module PsutilHelper
     end
   end
 
+  # There is a module called Process in ruby. 
+  # To distinguish from it, I name this one with `Processes`.
   class Processes
     # Returns a list of PIDs currently running on the system.
     def self.pids()
@@ -198,4 +203,4 @@ module PsutilHelper
   end
 
 end
-
+end

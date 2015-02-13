@@ -1,3 +1,4 @@
+module PosixPsutil
 class PsutilError < StandardError
   
   def to_s
@@ -42,4 +43,4 @@ class AccessDenied < PsutilError
     @message = opt[:msg]
   end
 end
-
+end

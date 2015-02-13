@@ -2,14 +2,17 @@
 # encoding: UTF-8
 
 require 'rbconfig'
+require_relative 'posixpsutil/common'
 
 os = RbConfig::CONFIG['host_os']
-require_relative 'posixpsutil/processes'
+# load process module
+require_relative 'posixpsutil/process'
+# load system module
 case os
-  when /darwin|mac os|solaris|bsd/
-    require_relative 'posixpsutil/posix'
-  when /linux/
-    require_relative 'posixpsutil/linux'
+  when PosixPsutil::COMMON::NON_LINUX_PLATFORM
+    require_relative 'posixpsutil/posix/system'
+  when PosixPsutil::COMMON::LINUX_PLATFORM
+    require_relative 'posixpsutil/linux/system'
   else
-    raise RuntimeError, "unknown os: #{os.inspect}"
+    raise RuntimeError, "unsupported os: #{os.inspect}"
 end

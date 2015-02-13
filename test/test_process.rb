@@ -1,6 +1,6 @@
 require 'minitest/autorun'
-require 'posixpsutil/processes'
 require 'timeout'
+require 'posixpsutil/process'
 
 class TestPsutilError < MiniTest::Test
    def test_access_denied
@@ -33,11 +33,11 @@ class TestPsutilError < MiniTest::Test
 
 end
 
-class TestProcesses < MiniTest::Test
+class TestProcess < MiniTest::Test
 
   def setup
     # if pid not given, the pid should be Process.pid
-    @process = Processes.new()
+    @process = PosixPsutil::Process.new()
   end
 
   def test_eq
@@ -136,7 +136,7 @@ class TestProcesses < MiniTest::Test
   def test_memory_percent
     @process.memory_percent
     # total memory should be cached after first called
-    refute_equal nil, Processes.class_variable_get(:@@total_phymem)
+    refute_equal nil, PosixPsutil::Process.class_variable_get(:@@total_phymem)
   end
 
   def test_memory_maps
@@ -174,10 +174,14 @@ class TestProcesses < MiniTest::Test
 end
 
 class TestPlatformSpecificMethod < MiniTest::Test
+
+  def setup
+    @os = RbConfig::CONFIG['host_os']
+  end
+
   def test_has_io_counters
-    has_method_defined = Processes.method_defined?('io_counters')
-    os = RbConfig::CONFIG['host_os']
-    if os =~ /linux/
+    has_method_defined = PosixPsutil::Process.method_defined?('io_counters')
+    if @os =~ /linux/
       assert_equal true, has_method_defined
     else
       assert_equal false, has_method_defined
@@ -185,25 +189,23 @@ class TestPlatformSpecificMethod < MiniTest::Test
   end 
 
   def test_has_ionice
-    has_method_defined = Processes.method_defined?('ionice')
-    os = RbConfig::CONFIG['host_os']
-    if os =~ /linux|bsd/
+    has_method_defined = PosixPsutil::Process.method_defined?('ionice')
+    if @os =~ /linux|bsd/
       assert_equal true, has_method_defined
     else
       assert_equal false, has_method_defined
     end
   end
 
-  if Processes.method_defined?('ionice')
+  if PosixPsutil::Process.method_defined?('ionice')
     def test_ionice
       # TODO test when it completed
     end
   end
 
   def test_has_rlimit
-    has_method_defined = Processes.method_defined?('rlimit')
-    os = RbConfig::CONFIG['host_os']
-    if os =~ /linux/
+    has_method_defined = PosixPsutil::Process.method_defined?('rlimit')
+    if @os =~ /linux/
       assert_equal true, has_method_defined
     else
       assert_equal false, has_method_defined
@@ -211,9 +213,8 @@ class TestPlatformSpecificMethod < MiniTest::Test
   end
 
   def test_has_cpu_affinity
-    has_method_defined = Processes.method_defined?('cpu_affinity')
-    os = RbConfig::CONFIG['host_os']
-    if os =~ /linux/
+    has_method_defined = PosixPsutil::Process.method_defined?('cpu_affinity')
+    if @os =~ /linux/
       assert_equal true, has_method_defined
     else
       assert_equal false, has_method_defined
@@ -222,25 +223,25 @@ class TestPlatformSpecificMethod < MiniTest::Test
 
 end
 
-class TestProcessesClassMethods < MiniTest::Test
+class TestProcessClassMethods < MiniTest::Test
 
   def test_pid_exists
-    assert_equal true, Processes.pid_exists(1)
+    assert_equal true, PosixPsutil::Process.pid_exists(1)
   end
 
   def test_processes
-    processes = Processes.processes
-    assert_equal true, processes.include?(Processes.new(Process.pid))
-    assert_equal true, processes.include?(Processes.new(1))
+    processes = PosixPsutil::Process.processes
+    assert_equal true, processes.include?(PosixPsutil::Process.new(Process.pid))
+    assert_equal true, processes.include?(PosixPsutil::Process.new(1))
     # processes() should cache processes in @@pmap
-    pmap = Processes.class_variable_get(:@@pmap)
+    pmap = PosixPsutil::Process.class_variable_get(:@@pmap)
     assert_equal true, processes.size == pmap.size
   end 
 
   def test_process_iter
-    iter = Processes.process_iter
-    assert_equal Processes.new(1), iter.next
+    iter = PosixPsutil::Process.process_iter
+    assert_equal PosixPsutil::Process.new(1), iter.next
     3.times { iter.next }
-    assert_equal Processes.processes[4], iter.next
+    assert_equal PosixPsutil::Process.processes[4], iter.next
   end
 end

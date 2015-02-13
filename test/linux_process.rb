@@ -1,6 +1,7 @@
-require 'minitest/autorun'
 require 'socket'
-require 'posixpsutil/linux_process'
+require 'posixpsutil/linux/process'
+
+include PosixPsutil
 
 class TestLinuxProcess < MiniTest::Test
   # since the exist of calling interval, we need a threshold
@@ -31,10 +32,13 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_connections_for_inet
-    # ping www.bing.com to create a tcp connection
-    Socket.tcp("www.bing.com", 80) {|sock|
-      assert_equal 1, @process.connections(:inet).size
-    }
+    begin
+      # ping www.bing.com to create a tcp connection
+      Socket.tcp("www.bing.com", 80) {|sock|
+        assert_equal 1, @process.connections(:inet).size
+      }
+    rescue SocketError # if there is no network connection, ignore the result
+    end
   end
 
   def test_connections_if_interface_not_supported

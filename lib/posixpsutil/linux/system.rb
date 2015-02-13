@@ -1,8 +1,9 @@
 require 'ostruct'
 require 'date'
-require_relative './common'
-require_relative './linux_helper'
+require_relative '../common'
+require_relative 'helper'
 
+module PosixPsutil
 class CPU
 
   def self.cpu_times(precpu=false)
@@ -467,4 +468,4 @@ class System
   end
 
 end
-
+end

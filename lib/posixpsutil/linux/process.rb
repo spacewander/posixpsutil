@@ -1,7 +1,8 @@
-require_relative 'common'
-require_relative 'linux_helper'
-require_relative 'psutil_error'
+require_relative '../common'
+require_relative '../psutil_error'
+require_relative 'helper'
 
+module PosixPsutil
 PROC_STATUSES = {
     "R" => COMMON::STATUS_RUNNING,
     "S" => COMMON::STATUS_SLEEPING,
@@ -472,4 +473,5 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     @@terminal_map
   end
 
+end
 end
