@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+Disks = PosixPsutil::Disks
 puts "Start running the Disks example"
 disk_partitions = Disks.disk_partitions
 puts "There are #{disk_partitions.size} devices"

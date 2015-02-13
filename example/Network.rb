@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+Network = PosixPsutil::Network
 puts "Start running the Network example"
 puts "Net io counter for eth0 :"
 netios = Network.net_io_counters(true)

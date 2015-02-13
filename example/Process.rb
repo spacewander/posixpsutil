@@ -3,23 +3,23 @@
 
 require_relative '../lib/posixpsutil'
 
-puts "Start running the Processes example"
-p = Processes.new()
-puts "Currently Processes Module support those class methods:"
-Processes.public_methods(false).each { |method| puts method }
+puts "Start running the PosixPsutil::Process example"
+p = PosixPsutil::Process.new()
+puts "Currently PosixPsutil::Process Module support those class methods:"
+PosixPsutil::Process.public_methods(false).each { |method| puts method }
 puts ''
 
 puts "And those instance methods:"
 p.public_methods(false).each { |method| puts method }
 puts ''
 
-puts "Current running Processes "
-puts Processes.process_iter
+puts "Current running PosixPsutil::Process "
+puts PosixPsutil::Process.process_iter
 puts ''
 
 puts 'Does Process with pid=1111 exist?'
-if Processes.pid_exists(1111)
-  existed_process = Processes.new(1111)
+if PosixPsutil::Process.pid_exists(1111)
+  existed_process = PosixPsutil::Process.new(1111)
   puts "Yes, it is there: #{existed_process}"
 else
   puts 'No, I can not find it'

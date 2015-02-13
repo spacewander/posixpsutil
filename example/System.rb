@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+System = PosixPsutil::System
 puts "Start running the System example"
 puts "Users detail :"
 puts "There are #{System.users.size} users"

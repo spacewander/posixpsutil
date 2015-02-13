@@ -3,6 +3,7 @@
 
 require_relative '../lib/posixpsutil'
 
+CPU = PosixPsutil::CPU
 def show_cpu()
   puts "The CPU number is #{CPU.cpu_count}"
   puts "The physical CPU number is #{CPU.cpu_count(false)}"
@@ -15,7 +16,6 @@ def show_cpu()
   puts "Each CPU percent(after a second) : #{CPU.cpu_percent(1.0, true)}"
   puts "Each CPU percent(immediate) : #{CPU.cpu_times_percent(0.1, true)}"
   puts "Each CPU percent(after a second) : #{CPU.cpu_times_percent(1.0, true)}"
-
 end
 
 puts "Start running the CPU example"

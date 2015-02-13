@@ -3,6 +3,7 @@
 
 require_relative "../lib/posixpsutil"
 
+Memory = PosixPsutil::Memory
 puts "Start running the Memory example"
 puts "Virtual memory info:"
 puts "Total: #{Memory.virtual_memory.total}"
