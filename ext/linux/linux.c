@@ -107,3 +107,29 @@ int get_cpu_affinity(long pid, long **cpu_affinity, int *cpu_count)
 }
 
 #endif
+
+/*
+ * Set process CPU affinity; expects a bitmask
+ * @param pid [in]
+ * @param cpu_affinity [out] a list of cpu affinity you want to set with
+ * @param seq_len [out] min(the length of list, the number of CPUs)
+ * @return
+ *   0      : ok.
+ *   errno  : specific error code reported by sched_setaffinity, like ENOMEM
+ */
+int set_cpu_affinity(long pid, long *cpu_affinity, int seq_len)
+{
+    cpu_set_t cpu_set;
+    int i;
+
+    CPU_ZERO(&cpu_set);
+    for (i = 0; i < seq_len; i++) {
+        CPU_SET(cpu_affinity[i], &cpu_set);
+    }
+
+    if (sched_setaffinity(pid,  sizeof( cpu_set_t ), &cpu_set)) {
+        return errno;
+    }
+
+    return 0;
+}

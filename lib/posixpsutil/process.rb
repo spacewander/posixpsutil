@@ -446,8 +446,20 @@ class Process
 
   # Linux only
   if PlatformSpecificProcess.method_defined? :cpu_affinity
+    # Get or set process CPU affinity.
+    # If specified 'cpus' must be a list of CPUs for which you
+    # want to set the affinity (e.g. [0, 1]).
+    #
+    # If 'cpus' is not an Array, an ArgumentError will be raised,
+    # if the length of 'cpus' larger than the number of CPUs, 
+    # the remain will be ignore.
     def cpu_affinity(cpus=nil)
-      
+      if cpus.nil?
+        @proc.cpu_affinity
+      elsif cpus.is_a?(Array)
+        @proc.cpu_affinity=(cpus)
+      end
+      raise ArgumentError.new("cpus must be an Array, got #{cpus}")
     end
   end
 

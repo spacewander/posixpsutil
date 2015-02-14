@@ -59,6 +59,17 @@ class TestLinuxProcess < MiniTest::Test
     assert !affinity.empty?
   end
 
+  def test_cpu_affinity=
+    before = @process.cpu_affinity
+    if before[0] == 0
+      after = [1]
+    else
+      after = [0]
+    end
+    @process.cpu_affinity=after
+    assert_equal after, @process.cpu_affinity
+  end
+
   def test_create_time
     assert @process.create_time() < Time.now.to_f
   end
@@ -203,7 +214,9 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
   end 
 
   def test_premission_denied
-    #PlatformSpecificProcess.new(1).name()
+    assert_raises AccessDenied do
+      PlatformSpecificProcess.new(1).exe()
+    end
   end
 
   def test_exe_access_denied
@@ -221,6 +234,35 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
   def test_assert_process_exists
     assert_raises NoSuchProcess do
       PlatformSpecificProcess.new(99999).connections()
+    end
+  end
+
+  def test_get_cpu_affinity_on_no_such_process
+    assert_raises NoSuchProcess do
+      PlatformSpecificProcess.new(99999).cpu_affinity
+    end
+  end
+
+  def test_set_cpu_affinity_on_no_such_process
+    assert_raises NoSuchProcess do
+      PlatformSpecificProcess.new(99999).cpu_affinity=[1]
+    end
+  end
+
+  def test_set_cpu_affinity_access_denied
+    assert_raises AccessDenied do
+      PlatformSpecificProcess.new(1).cpu_affinity=[1]
+    end
+  end
+
+  def test_set_cpu_affinity_too_long
+    # assert raise nothing
+    PlatformSpecificProcess.new(Process.pid).cpu_affinity=[1, 1, 1, 1]
+  end
+
+  def test_set_cpu_affinity_affinity_too_large
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).cpu_affinity=[1000]
     end
   end
 

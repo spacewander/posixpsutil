@@ -4,6 +4,7 @@ require_relative '../common'
 require_relative '../psutil_error'
 require_relative '../libc'
 require_relative 'helper'
+require_relative 'system'
 
 module PosixPsutil
 PROC_STATUSES = {
@@ -28,6 +29,7 @@ module LibPosixPsutil
   ffi_lib COMMON::LibLinuxName
   
   attach_function 'get_cpu_affinity', [:long, :pointer, :pointer], :int
+  attach_function 'set_cpu_affinity', [:long, :pointer, :int], :int
 end
 
 class PlatformSpecificProcess < PsutilHelper::Processes
@@ -116,12 +118,14 @@ class PlatformSpecificProcess < PsutilHelper::Processes
 
   def cpu_affinity
     FFI::MemoryPointer.new(:pointer, 1) do |p|
-      # p is an double pointer, we will malloc enough space for the pointer it holds in `get_cpu_affinity`
+      # p is an double pointer, 
+      # we will malloc enough space for the pointer it holds in `get_cpu_affinity`
       cpu_count = FFI::MemoryPointer.new(:pointer, 1)
       status = LibPosixPsutil.get_cpu_affinity(@pid, p, cpu_count)
       case status
       when 0
         affinity = p.get_pointer(0).get_array_of_long(0, cpu_count.read_int)
+        LibC.free p.get_pointer(0)
         return affinity
       when -1 # got nothing
         return []
@@ -132,7 +136,27 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def cpu_affinity=(cpus)
-    # TODO
+    total_cpus = CPU.cpu_count
+    seq_len = cpus.size > total_cpus ? total_cpus : cpus.size
+    begin
+      FFI::MemoryPointer.new(:pointer, seq_len) do |affinity|
+        affinity.write_array_of_long(cpus[0...seq_len])
+        status = LibPosixPsutil.set_cpu_affinity(@pid, affinity, seq_len)
+        raise SystemCallError.new('in set_cpu_affinity', status) if status != 0
+      end
+    # The  affinity bit mask mask contains no processors that are currently 
+    # physically on the system and permitted to the thread according to any 
+    # restrictions that may be imposed by the "cpuset" mechanism 
+    # described in cpuset(7)
+    rescue Errno::EINVAL
+      cpus.each do |cpu|
+        if cpu < 0 || cpu >= total_cpus
+          raise ArgumentError.new
+            "invalid CPU #{cpu} (choose between 0 to #{total_cpus})"
+        end
+      end
+      raise
+    end
   end
 
   def exe
