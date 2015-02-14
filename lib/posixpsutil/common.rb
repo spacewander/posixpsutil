@@ -10,6 +10,13 @@ NON_LINUX_PLATFORM = /darwin|mac os|solaris|bsd|aix/i
 OSX_PLAFORM = /darwin|mac os/i
 NON_OSX_PLATFORM = /linux|solaris|bsd|aix/i
 
+# The name of dynamic library where we put platform specific C extention into.
+# If you want to change the name, please change ext/*/Makefile too.
+EXT=File.expand_path('ext', '.')
+LibLinuxName = File.join(EXT, 'linux', 'libposixpsutil.so')
+LibPosixName = File.join(EXT, 'posix', 'libposixpsutil.so')
+LibOSXName = File.join(EXT, 'posix', 'libposixpsutil.dylib')
+
 # CLOCK_TICKS = 100
 CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
 # PAGE_SIZE = 4096
@@ -28,8 +35,8 @@ STATUS_IDLE = "idle"  # BSD
 STATUS_LOCKED = "locked"  # BSD
 STATUS_WAITING = "waiting"  # BSD
 
+# Calculate percentage usage of 'used' against 'total'.
 def self.usage_percent(used, total, _round=nil)
-  # Calculate percentage usage of 'used' against 'total'.
   begin
       ret = (used / total.to_f) * 100
   rescue ZeroDivisionError
@@ -82,7 +89,7 @@ module NetworkConstance
 end
 
 # this module places helper functions used in all posix platform 
-# Processes implementions
+# Process implementions
 module POSIX
 
 # Check whether pid exists in the current process table."""

@@ -71,7 +71,7 @@ class TestProcess < MiniTest::Test
   end
 
   def test_to_hash_symbol_only
-    assert_equal true, @process.to_hash(["exe", "cwd"]).empty?
+    assert @process.to_hash(["exe", "cwd"]).empty?
   end
 
   def test_inspect
@@ -84,12 +84,12 @@ class TestProcess < MiniTest::Test
   end
 
   def test_is_running
-    assert_equal true, @process.is_running
+    assert @process.is_running
   end
 
   def test_name
     # current process
-    assert_equal true, @process.name().start_with?('ruby')
+    assert @process.name().start_with?('ruby')
   end
 
   def test_cmdline
@@ -98,7 +98,7 @@ class TestProcess < MiniTest::Test
   end
 
   def test_exe
-    assert_equal true, @process.exe().start_with?("/usr/bin/ruby")
+    assert @process.exe().start_with?("/usr/bin/ruby")
   end
 
   def test_username
@@ -110,13 +110,13 @@ class TestProcess < MiniTest::Test
     #10000.times { |i|  i ** 6}
     # your machine, err, may take less than 50 percent of cpu resource to
     # finish above process
-    #assert_equal true, @process.cpu_percent > 50
+    #assert @process.cpu_percent > 50
     sleep 0.1
     last_proc_cpu_times = @process.instance_variable_get(:@last_proc_cpu_times)
     last_proc_cpu_times.user -= 0.1
     @process.instance_variable_set(:@last_proc_cpu_times, last_proc_cpu_times)
     # approximately 100
-    assert_equal true, @process.cpu_percent > 50
+    assert @process.cpu_percent > 50
 
     # test cpu_percent (blocking)
     start = Time.now
@@ -127,10 +127,10 @@ class TestProcess < MiniTest::Test
 
   def test_children
     sh = @process.parent()
-    assert_equal true, sh.children().include?(@process)
+    assert sh.children().include?(@process)
     children = sh.parent.children(true)
-    assert_equal true, children.include?(@process)
-    assert_equal true, children.include?(sh)
+    assert children.include?(@process)
+    assert children.include?(sh)
   end
 
   def test_memory_percent
@@ -143,8 +143,8 @@ class TestProcess < MiniTest::Test
     maps = @process.memory_maps
     no_groupby_maps = @process.memory_maps(false)
     assert_equal maps.size, maps.uniq.size
-    assert_equal true, maps.size <= no_groupby_maps.size
-    assert_equal true, maps[0].size >= no_groupby_maps[0].size
+    assert maps.size <= no_groupby_maps.size
+    assert maps[0].size >= no_groupby_maps[0].size
   end
 
   def test_send_signal
@@ -161,8 +161,8 @@ class TestProcess < MiniTest::Test
     @process.resume
     Signal.trap("TERM", old_term_handler)
     Signal.trap("CONT", old_cont_handler)
-    assert_equal true, hasTerminated
-    assert_equal true, hasResumed
+    assert hasTerminated
+    assert hasResumed
   end
 
   def test_wait_with_timeout
@@ -182,18 +182,18 @@ class TestPlatformSpecificMethod < MiniTest::Test
   def test_has_io_counters
     has_method_defined = PosixPsutil::Process.method_defined?('io_counters')
     if @os =~ /linux/
-      assert_equal true, has_method_defined
+      assert has_method_defined
     else
-      assert_equal false, has_method_defined
+      assert !has_method_defined
     end
   end 
 
   def test_has_ionice
     has_method_defined = PosixPsutil::Process.method_defined?('ionice')
     if @os =~ /linux|bsd/
-      assert_equal true, has_method_defined
+      assert has_method_defined
     else
-      assert_equal false, has_method_defined
+      assert !has_method_defined
     end
   end
 
@@ -206,18 +206,18 @@ class TestPlatformSpecificMethod < MiniTest::Test
   def test_has_rlimit
     has_method_defined = PosixPsutil::Process.method_defined?('rlimit')
     if @os =~ /linux/
-      assert_equal true, has_method_defined
+      assert has_method_defined
     else
-      assert_equal false, has_method_defined
+      assert !has_method_defined
     end
   end
 
   def test_has_cpu_affinity
     has_method_defined = PosixPsutil::Process.method_defined?('cpu_affinity')
     if @os =~ /linux/
-      assert_equal true, has_method_defined
+      assert has_method_defined
     else
-      assert_equal false, has_method_defined
+      assert !has_method_defined
     end
   end
 
@@ -226,16 +226,16 @@ end
 class TestProcessClassMethods < MiniTest::Test
 
   def test_pid_exists
-    assert_equal true, PosixPsutil::Process.pid_exists(1)
+    assert PosixPsutil::Process.pid_exists(1)
   end
 
   def test_processes
     processes = PosixPsutil::Process.processes
-    assert_equal true, processes.include?(PosixPsutil::Process.new(Process.pid))
-    assert_equal true, processes.include?(PosixPsutil::Process.new(1))
+    assert processes.include?(PosixPsutil::Process.new(Process.pid))
+    assert processes.include?(PosixPsutil::Process.new(1))
     # processes() should cache processes in @@pmap
     pmap = PosixPsutil::Process.class_variable_get(:@@pmap)
-    assert_equal true, processes.size == pmap.size
+    assert processes.size == pmap.size
   end 
 
   def test_process_iter

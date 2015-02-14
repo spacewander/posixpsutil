@@ -53,8 +53,14 @@ class TestLinuxProcess < MiniTest::Test
     assert_in_delta Process.times.stime, cpu_times.system, 0.01
   end
 
+  def test_cpu_affinity
+    affinity = @process.cpu_affinity
+    assert affinity.is_a?(Array)
+    assert !affinity.empty?
+  end
+
   def test_create_time
-    assert_equal true, @process.create_time() < Time.now.to_f
+    assert @process.create_time() < Time.now.to_f
   end
 
   def test_cwd
@@ -62,7 +68,7 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_exe
-    assert_equal true, @process.exe().start_with?("/usr/bin/ruby")
+    assert @process.exe().start_with?("/usr/bin/ruby")
   end
 
   def test_gids
@@ -105,7 +111,7 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_name
     # current process
-    assert_equal true, @process.name().start_with?('ruby')
+    assert @process.name().start_with?('ruby')
   end
 
   def test_nice
@@ -164,7 +170,7 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_terminal
     tty = @process.terminal()
-    assert_equal true, tty.start_with?('/dev/tty') || tty.start_with?('/dev/pts/')
+    assert tty.start_with?('/dev/tty') || tty.start_with?('/dev/pts/')
   end
 
   def test_threads
@@ -177,7 +183,7 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_time_used
     former_process_time_used = @process.time_used()
-    assert_equal true, @process.time_used() >= former_process_time_used
+    assert @process.time_used() >= former_process_time_used
   end
 
   def test_uids
@@ -223,8 +229,8 @@ end
 class TestLinuxProcessClassMethods < MiniTest::Test
   def test_pids
     pids = PlatformSpecificProcess.pids
-    assert_equal true, pids.include?(1)
-    assert_equal true, pids.include?(Process.pid)
+    assert pids.include?(1)
+    assert pids.include?(Process.pid)
   end
 
 end

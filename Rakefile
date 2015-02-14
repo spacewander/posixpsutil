@@ -57,11 +57,11 @@ Rake::TestTask.new do |t|
   t.libs << 'test'
   t.pattern = 'test/**/test_*.rb'
   t.verbose = false
-  # so we can type `rake TEST="processes.rb"` instead of `rake TEST="test/test_processes.rb"`
+  # so we can type `rake TEST="processes"` instead of `rake TEST="test/test_processes.rb"`
   test = ENV['TEST']
   unless test.nil?
-    Dir.chdir 'test'
-    ENV['TEST'] = 'test_' + test unless test.start_with? 'test_'
+    ENV['TEST'] = 'test/test_' + test unless test.start_with? 'test/test_'
+    ENV['TEST'] += '.rb' unless test.end_with? '.rb'
   end
 end
 

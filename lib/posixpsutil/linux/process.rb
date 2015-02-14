@@ -1,5 +1,8 @@
+require 'ffi'
+
 require_relative '../common'
 require_relative '../psutil_error'
+require_relative '../libc'
 require_relative 'helper'
 
 module PosixPsutil
@@ -18,6 +21,14 @@ PROC_STATUSES = {
 
 PAGE_SIZE = COMMON::PAGE_SIZE
 CLOCK_TICKS = COMMON::CLOCK_TICKS
+
+# C extention for linux platform
+module LibPosixPsutil
+  extend FFI::Library
+  ffi_lib COMMON::LibLinuxName
+  
+  attach_function 'get_cpu_affinity', [:long, :pointer, :pointer], :int
+end
 
 class PlatformSpecificProcess < PsutilHelper::Processes
   include PsutilHelper
@@ -104,7 +115,20 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def cpu_affinity
-    # TODO implement it with C
+    FFI::MemoryPointer.new(:pointer, 1) do |p|
+      # p is an double pointer, we will malloc enough space for the pointer it holds in `get_cpu_affinity`
+      cpu_count = FFI::MemoryPointer.new(:pointer, 1)
+      status = LibPosixPsutil.get_cpu_affinity(@pid, p, cpu_count)
+      case status
+      when 0
+        affinity = p.get_pointer(0).get_array_of_long(0, cpu_count.read_int)
+        return affinity
+      when -1 # got nothing
+        return []
+      else # error occured
+        raise SystemCallError.new('in get_cpu_affinity', status)
+      end
+    end
   end
 
   def cpu_affinity=(cpus)

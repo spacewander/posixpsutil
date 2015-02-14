@@ -7,9 +7,9 @@ class TestPOSIX < MiniTest::Test
   include POSIX
 
   def test_pid_exists
-    assert_equal true, pid_exists(1)
-    assert_equal true, pid_exists(Process.pid)
-    assert_equal false, pid_exists(99999)
+    assert pid_exists(1)
+    assert pid_exists(Process.pid)
+    assert !pid_exists(99999)
   end
 
   def test_wait_pid_child_exit_by_exit

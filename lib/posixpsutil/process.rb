@@ -447,6 +447,7 @@ class Process
   # Linux only
   if PlatformSpecificProcess.method_defined? :cpu_affinity
     def cpu_affinity(cpus=nil)
+      
     end
   end
 

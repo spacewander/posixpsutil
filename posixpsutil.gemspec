@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.homepage    = 'https://github.com/spacewander/posixpsutil'
   s.summary     = 'A posix process and system utilities module for Ruby'
   s.description = 'posixpsutil is a ruby gem which shows process and system information for you'
-  s.files       = Dir["lib/**/*"] + ["README.md", "Rakefile"]
+  s.files       = Dir["lib/**/*"] + Dir["ext/**/*"] + ["README.md", "Rakefile"]
   s.test_files  = Dir["test/*"]
   s.license     = 'new BSD'
   s.add_dependency 'ffi'
