@@ -24,30 +24,33 @@ CLEAN.include(
   '**/*.dylib'              # dynamic load library on OS X
 )
 
+desc "run all examples one by one"
 task :example => [:build] do
   Dir.glob('example/*.rb').each do |file|
     sh "ruby #{file}"
   end
 end
 
-task :build do
-  if CONFIG['host_os'] =~ /linux/
-    dir = 'ext/linux'
+def make_srcs(task=nil)
+  if CONFIG['host_os'] =~ /linux/i
+    params = "platform='linux'"
   else
-    dir = 'ext/posix'
+    params = "platform='posix'"
   end
-  Dir.chdir(dir) do
-    sh 'make'
+
+  params = "install " + params if task == :install
+  Dir.chdir 'ext' do
+    sh "make #{params}"
   end
 end
 
+desc "build C extention"
+task :build do
+  make_srcs
+end
+
 task :install => [:clean] do
-  if CONFIG['host_os'] =~ /linux/
-    Dir.chdir('ext/linux')
-  else
-    Dir.chdir('ext/posix')
-  end
-  sh 'make install'
+  make_srcs :install
   #TODO Don't really install it now
 end
 

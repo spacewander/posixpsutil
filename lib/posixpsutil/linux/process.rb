@@ -1,10 +1,9 @@
-require 'ffi'
-
 require_relative '../common'
 require_relative '../psutil_error'
 require_relative '../libc'
 require_relative 'helper'
 require_relative 'system'
+require_relative 'libposixpsutil'
 
 module PosixPsutil
 
@@ -30,17 +29,6 @@ IOPRIO_CLASS_IDLE = 3
 
 PAGE_SIZE = COMMON::PAGE_SIZE
 CLOCK_TICKS = COMMON::CLOCK_TICKS
-
-# C extention for linux platform
-module LibPosixPsutil
-  extend FFI::Library
-  ffi_lib COMMON::LibLinuxName
-  
-  attach_function 'get_cpu_affinity', [:long, :pointer, :pointer], :int
-  attach_function 'set_cpu_affinity', [:long, :pointer, :int], :int
-  attach_function 'get_ionice', [:long, :pointer, :pointer], :int
-  attach_function 'set_ionice', [:long, :int, :int], :int
-end
 
 class PlatformSpecificProcess < PsutilHelper::Processes
   include PsutilHelper
