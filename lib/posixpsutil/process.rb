@@ -427,6 +427,7 @@ class Process
     # On Linux 'ioclass' is one of the IOPRIO_CLASS_* constants.
     # 'value' is a number which goes from 0 to 7. The higher the
     # value, the lower the I/O priority of the process.
+    # `man ionice` for further info
     def ionice(ioclass=nil, value=nil)
       if ioclass.nil? 
         raise ArgumentError.new("'ioclass' must be specified") if value

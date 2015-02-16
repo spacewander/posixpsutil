@@ -6,6 +6,8 @@
 #include <limits.h>
 #include <sched.h>
 #include <stdlib.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include "./linux.h"
 
@@ -131,5 +133,51 @@ int set_cpu_affinity(long pid, long *cpu_affinity, int seq_len)
         return errno;
     }
 
+    return 0;
+}
+
+/* find them in linux/ioprio.h */
+enum {
+    IOPRIO_WHO_PROCESS = 1,
+    IOPRIO_WHO_PGRP,
+    IOPRIO_WHO_USER,
+};
+
+#define IOPRIO_CLASS_SHIFT 13
+#define IOPRIO_PRIO_MASK ((1UL << IOPRIO_CLASS_SHIFT) - 1)
+
+#define IOPRIO_PRIO_CLASS(mask) ((mask) >> IOPRIO_CLASS_SHIFT)
+#define IOPRIO_PRIO_DATA(mask) ((mask) & IOPRIO_PRIO_MASK)
+#define IOPRIO_PRIO_VALUE(class, data) (((class) << IOPRIO_CLASS_SHIFT) | data)
+
+/*
+ * Return ioclass and iodata representing process I/O priority.
+ * @return
+ * 0    : ok.
+ * else : the errno code indicates what went wrong
+ */
+int get_ionice(long pid, int *ioclass, int *iodata)
+{
+    int ioprio = syscall(__NR_ioprio_get, IOPRIO_WHO_PROCESS, pid);
+    if (ioprio == -1) {
+        return errno;
+    }
+    *ioclass = IOPRIO_PRIO_CLASS(ioprio);
+    *iodata = IOPRIO_PRIO_DATA(ioprio);
+    return 0;
+}
+
+/*
+ * sets process I/O priority.
+ * ioclass can be either IOPRIO_CLASS_RT, IOPRIO_CLASS_BE, IOPRIO_CLASS_IDLE
+ * or 0. iodata goes from 0 to 7 depending on ioclass specified.
+ * @return 0 for ok and other for errno code
+ */
+int set_ionice(long pid, int ioclass, int iodata)
+{
+    int ioprio = IOPRIO_PRIO_VALUE(ioclass, iodata);
+    if (syscall(__NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, ioprio) == -1) {
+        return errno;
+    }
     return 0;
 }

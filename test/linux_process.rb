@@ -98,6 +98,22 @@ class TestLinuxProcess < MiniTest::Test
     assert_respond_to io_counters, :wbytes
   end
 
+  def test_ionice
+    ionice = @process.ionice
+    assert [0, 1, 2, 3, 4].include? ionice.ioclass
+    # Since the ioclass output is depending on your system language, 
+    # we can't parse it correctly, so just parse the value
+    value = IO.popen("ionice -p #{Process.pid}").read.split.last.to_i
+    assert_equal value, ionice.value
+  end
+
+  def test_set_ionice
+    @process.set_ionice(2, 0) # best-effort, highest level
+    ionice = @process.ionice
+    assert_equal 2, ionice.ioclass
+    assert_equal 0, ionice.value
+  end
+
   def test_memory_info
     memory_info = @process.memory_info
     # Virtual Memory Size

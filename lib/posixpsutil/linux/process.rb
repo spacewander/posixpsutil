@@ -7,6 +7,8 @@ require_relative 'helper'
 require_relative 'system'
 
 module PosixPsutil
+
+# taken from /fs/proc/array.c
 PROC_STATUSES = {
     "R" => COMMON::STATUS_RUNNING,
     "S" => COMMON::STATUS_SLEEPING,
@@ -20,6 +22,12 @@ PROC_STATUSES = {
     "W" => COMMON::STATUS_WAKING
 }
 
+# ioprio_* constants http://linux.die.net/man/2/ioprio_get
+IOPRIO_CLASS_NONE = 0
+IOPRIO_CLASS_RT = 1
+IOPRIO_CLASS_BE = 2
+IOPRIO_CLASS_IDLE = 3
+
 PAGE_SIZE = COMMON::PAGE_SIZE
 CLOCK_TICKS = COMMON::CLOCK_TICKS
 
@@ -30,6 +38,8 @@ module LibPosixPsutil
   
   attach_function 'get_cpu_affinity', [:long, :pointer, :pointer], :int
   attach_function 'set_cpu_affinity', [:long, :pointer, :int], :int
+  attach_function 'get_ionice', [:long, :pointer, :pointer], :int
+  attach_function 'set_ionice', [:long, :int, :int], :int
 end
 
 class PlatformSpecificProcess < PsutilHelper::Processes
@@ -220,11 +230,32 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def ionice
-    # TODO implement it with C
+    ioclass = FFI::MemoryPointer.new(:pointer, 1)
+    value = FFI::MemoryPointer.new(:pointer, 1)
+    status = LibPosixPsutil.get_ionice(@pid, ioclass, value)
+    raise SystemCallError.new('in get_ionice', status) if status != 0
+    OpenStruct.new(ioclass: ioclass.read_int, value: value.read_int)
   end
 
   def set_ionice(ioclass, value)
-    # TODO implement it with C
+    ioclass ||= IOPRIO_CLASS_NONE
+    case ioclass
+    when IOPRIO_CLASS_NONE
+      raise ArgumentError.new("can't specify value with IOPRIO_CLASS_NONE") if value
+      value = 0
+    when IOPRIO_CLASS_RT, IOPRIO_CLASS_BE
+      value = 4 if value.nil?
+    when IOPRIO_CLASS_IDLE
+      raise ArgumentError.new("can't specify value with IOPRIO_CLASS_IDLE") if value
+      value = 0
+    else
+      value = 0
+    end
+    if value < 0 || value > 7
+      raise ArgumentError.new("value argument range expected is btween 0 and 7")
+    end
+    status = LibPosixPsutil.set_ionice(@pid, ioclass, value)
+    raise SystemCallError.new('in set_ionice', status) if status != 0
   end
 
   def memory_info
