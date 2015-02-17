@@ -225,6 +225,12 @@ end
 
 class TestProcessClassMethods < MiniTest::Test
 
+  def test_pids
+    pids = PosixPsutil::Process.pids
+    assert pids.include?(1)
+    assert pids.include?(Process.pid)
+  end
+
   def test_pid_exists
     assert PosixPsutil::Process.pid_exists(1)
   end

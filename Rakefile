@@ -32,7 +32,9 @@ task :example => [:build] do
 end
 
 def make_srcs(task=nil)
-  if CONFIG['host_os'] =~ /linux/i
+  if !ENV['platform'].nil?
+    params = "platform='#{ENV['platform']}'"
+  elsif CONFIG['host_os'] =~ /linux/i
     params = "platform='linux'"
   else
     params = "platform='posix'"

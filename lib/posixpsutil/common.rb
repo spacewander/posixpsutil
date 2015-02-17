@@ -17,10 +17,8 @@ LibLinuxName = File.join(EXT, 'linux', 'libposixpsutil.so')
 LibPosixName = File.join(EXT, 'posix', 'libposixpsutil.so')
 LibOSXName = File.join(EXT, 'posix', 'libposixpsutil.dylib')
 
-# CLOCK_TICKS = 100
-CLOCK_TICKS = IO.popen('getconf CLK_TCK').read.to_i
-# PAGE_SIZE = 4096
-PAGE_SIZE = IO.popen('getconf PAGE_SIZE').read.to_i
+CLOCK_TICKS = 100
+PAGE_SIZE = 4096
      
 STATUS_RUNNING = "running"
 STATUS_SLEEPING = "sleeping"

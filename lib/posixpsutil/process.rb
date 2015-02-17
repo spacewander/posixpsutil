@@ -366,14 +366,19 @@ class Process
     @proc.cwd
   end
   
-  # Get or set process niceness (priority).
+  # Get process niceness (priority).
   def nice
     @proc.nice
   end
 
+  # Set process niceness.
+  # Niceness values range from -20 (most favorable to the process) to 19 
+  # (least favorable to the process) on Linux.
   def nice=(value)
     raise NoSuchProcess.new(pid:@pid) unless is_running()
-    @proc.nice = value
+    # valid niceness range is system dependency, 
+    # so let each platform specific implemention handle the input
+    @proc.nice = value 
   end
 
   # Return process UIDs as #<OpenStruct real, effective, saved>
@@ -428,6 +433,12 @@ class Process
     # 'value' is a number which goes from 0 to 7. The higher the
     # value, the lower the I/O priority of the process.
     # `man ionice` for further info
+    # 
+    # You can use symbols or CONSTANTS as ioclass argument.
+    # IOPRIO_CLASS_NONE :none => 0
+    # IOPRIO_CLASS_RT :rt => 1
+    # IOPRIO_CLASS_BE :be => 2
+    # IOPRIO_CLASS_IDLE :idle => 3
     def ionice(ioclass=nil, value=nil)
       if ioclass.nil? 
         raise ArgumentError.new("'ioclass' must be specified") if value
@@ -441,12 +452,28 @@ class Process
 
   # Linux only
   if PlatformSpecificProcess.method_defined? :rlimit
+    # Get or set process resource limits as a {:soft, :hard} Hash.
+    #
+    # 'resource' is one of the RLIMIT_* constants.
+    # Unlike other API, 'limits' is supposed to be a {:soft, :hard} Hash,
+    # instead of an OpenStruct. Since using Hash as input is more common 
+    # than using OpenStruct (and more handy, too).
+    #
+    # `man prlimit` for further info.
+    # And see bits/resource.h for the detail about resource.
+    # 
+    # You can use symbols or CONSTANTS as resource argument.
+    # RLIMIT_CPU :cpu => 0
+    # RLIMIT_FSIZE :fsize => 1
+    # RLIMIT_
     def rlimit(resource, limits=nil)
+        @proc.rlimit
     end
   end
 
   # Linux only
-  if PlatformSpecificProcess.method_defined? :cpu_affinity
+  if PlatformSpecificProcess.method_defined?(:cpu_affinity)  \
+    && PlatformSpecificProcess.method_defined?(:cpu_affinity=)
     # Get or set process CPU affinity.
     # If specified 'cpus' must be a list of CPUs for which you
     # want to set the affinity (e.g. [0, 1]).

@@ -1,6 +1,6 @@
 require 'ostruct'
 require 'date'
-require_relative '../common'
+require_relative 'libposixpsutil'
 require_relative 'helper'
 
 module PosixPsutil
@@ -116,7 +116,7 @@ class CPU
   #        (10) Time spent running a niced guest (virtual CPU for guest operating systems under the control of the Linux kernel).
   def self.get_cpu_fields(line)
     stat = line.split(" ")
-    clk_tck = COMMON::CLOCK_TICKS 
+    clk_tck = LibPosixPsutil::CLOCK_TICKS 
     cpu = OpenStruct.new
     cpu.user = stat[1].to_f / clk_tck
     cpu.nice = stat[2].to_f / clk_tck

@@ -1,12 +1,15 @@
 #ifndef _GNU_SOURCE
     #define _GNU_SOURCE     1 /* See feature_test_macros(7) */
 #endif
+#define _FILE_OFFSET_BITS 64
 
 #include <errno.h>
 #include <limits.h>
 #include <sched.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "./linux.h"
@@ -177,6 +180,39 @@ int set_ionice(long pid, int ioclass, int iodata)
 {
     int ioprio = IOPRIO_PRIO_VALUE(ioclass, iodata);
     if (syscall(__NR_ioprio_set, IOPRIO_WHO_PROCESS, pid, ioprio) == -1) {
+        return errno;
+    }
+    return 0;
+}
+
+/*
+ * A wrapper around prlimit(2); gets process resource limits.
+ * @param 'soft' for rlim_max
+ * @param 'hard' for rlim_cur
+ */
+int get_rlimit(long pid, int resource, long long *soft, long long *hard)
+{
+    struct rlimit cur;
+    if (prlimit(pid, resource, NULL, &cur) == -1) {
+        return errno;
+    }
+    *soft = cur.rlim_cur;
+    *hard = cur.rlim_max;
+    return 0;
+}
+
+/*
+ * A wrapper around prlimit(2); sets process resource limits.
+ * @param 'soft' for rlim_max
+ * @param 'hard' for rlim_cur
+ */
+int set_rlimit(long pid, int resource, long long soft, long long hard)
+{
+    struct rlimit before; 
+    struct rlimit after;
+    after.rlim_cur = soft;
+    after.rlim_max = hard;
+    if (prlimit(pid, resource, &after, &before) == -1) {
         return errno;
     }
     return 0;

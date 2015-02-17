@@ -4,8 +4,8 @@ require 'posixpsutil/linux/process'
 include PosixPsutil
 
 class TestLinuxProcess < MiniTest::Test
-  # since the exist of calling interval, we need a threshold
-  THRESHOLD = 0.01
+  # we need a threshold
+  THRESHOLD = 0.0101
 
   def setup
     @process = PlatformSpecificProcess.new(Process.pid)
@@ -49,8 +49,8 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_cpu_times
     cpu_times = @process.cpu_times
-    assert_in_delta Process.times.utime, cpu_times.user, 0.01
-    assert_in_delta Process.times.stime, cpu_times.system, 0.01
+    assert_in_delta Process.times.utime, cpu_times.user, THRESHOLD
+    assert_in_delta Process.times.stime, cpu_times.system, THRESHOLD
   end
 
   def test_cpu_affinity
@@ -108,7 +108,10 @@ class TestLinuxProcess < MiniTest::Test
   end
 
   def test_set_ionice
-    @process.set_ionice(2, 0) # best-effort, highest level
+    # best-effort, highest level
+    #@process.set_ionice(PosixPsutil::IOPRIO_CLASS_BE, 0) 
+    # or
+    @process.set_ionice(:be, 0)
     ionice = @process.ionice
     assert_equal 2, ionice.ioclass
     assert_equal 0, ionice.value
@@ -143,6 +146,11 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_nice
     @process.nice
+  end
+
+  def test_nice=
+    @process.nice=1
+    assert_equal(1, @process.nice)
   end
 
   def test_num_ctx_switches
@@ -189,6 +197,17 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_ppid
     assert_equal Process.ppid, @process.ppid
+  end
+
+  def test_rlimit
+    # Number of open files
+    rlimit = @process.rlimit(7)
+    assert rlimit.key? :soft
+    assert rlimit.key? :hard
+
+    rlimit[:soft] = rlimit[:hard]
+    new_rlimit = @process.rlimit(7, rlimit)
+    assert_equal rlimit, new_rlimit
   end
 
   def test_status
@@ -282,13 +301,30 @@ class TestLinuxProcessErrorHandler < MiniTest::Test
     end
   end
 
-end
-
-class TestLinuxProcessClassMethods < MiniTest::Test
-  def test_pids
-    pids = PlatformSpecificProcess.pids
-    assert pids.include?(1)
-    assert pids.include?(Process.pid)
+  def test_set_ionice_argument_error
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).set_ionice(1, 5.5)
+    end
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).set_ionice(4, 0)
+    end
   end
 
+  def test_set_nice_argument_error
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).nice = 0.5
+    end
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).nice = -21
+    end
+  end
+
+  def test_set_rlimit_argument_error
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).rlimit(1, [20, 1])
+    end
+    assert_raises ArgumentError do
+      PlatformSpecificProcess.new(Process.pid).rlimit(1, {:soft => 1})
+    end
+  end
 end

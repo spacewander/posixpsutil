@@ -1,4 +1,3 @@
-require_relative '../common'
 require_relative '../psutil_error'
 require_relative '../libc'
 require_relative 'helper'
@@ -27,8 +26,15 @@ IOPRIO_CLASS_RT = 1
 IOPRIO_CLASS_BE = 2
 IOPRIO_CLASS_IDLE = 3
 
-PAGE_SIZE = COMMON::PAGE_SIZE
-CLOCK_TICKS = COMMON::CLOCK_TICKS
+IOPRIO_CLASS = {
+  :none => IOPRIO_CLASS_NONE,
+  :rt => IOPRIO_CLASS_RT,
+  :be => IOPRIO_CLASS_BE,
+  :idle => IOPRIO_CLASS_IDLE
+}
+
+PAGE_SIZE = LibPosixPsutil::PAGE_SIZE
+CLOCK_TICKS = LibPosixPsutil::CLOCK_TICKS
 
 class PlatformSpecificProcess < PsutilHelper::Processes
   include PsutilHelper
@@ -118,7 +124,7 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     FFI::MemoryPointer.new(:pointer, 1) do |p|
       # p is an double pointer, 
       # we will malloc enough space for the pointer it holds in `get_cpu_affinity`
-      cpu_count = FFI::MemoryPointer.new(:pointer, 1)
+      cpu_count = FFI::MemoryPointer.new(:int, 1)
       status = LibPosixPsutil.get_cpu_affinity(@pid, p, cpu_count)
       case status
       when 0
@@ -137,7 +143,7 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     total_cpus = CPU.cpu_count
     seq_len = cpus.size > total_cpus ? total_cpus : cpus.size
     begin
-      FFI::MemoryPointer.new(:pointer, seq_len) do |affinity|
+      FFI::MemoryPointer.new(:long, seq_len) do |affinity|
         affinity.write_array_of_long(cpus[0...seq_len])
         status = LibPosixPsutil.set_cpu_affinity(@pid, affinity, seq_len)
         raise SystemCallError.new('in set_cpu_affinity', status) if status != 0
@@ -218,8 +224,8 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def ionice
-    ioclass = FFI::MemoryPointer.new(:pointer, 1)
-    value = FFI::MemoryPointer.new(:pointer, 1)
+    ioclass = FFI::MemoryPointer.new(:int, 1)
+    value = FFI::MemoryPointer.new(:int, 1)
     status = LibPosixPsutil.get_ionice(@pid, ioclass, value)
     raise SystemCallError.new('in get_ionice', status) if status != 0
     OpenStruct.new(ioclass: ioclass.read_int, value: value.read_int)
@@ -227,20 +233,32 @@ class PlatformSpecificProcess < PsutilHelper::Processes
 
   def set_ionice(ioclass, value)
     ioclass ||= IOPRIO_CLASS_NONE
+
+    if ioclass.is_a?(Symbol)
+      unless IOPRIO_CLASS.key? ioclass
+        symbols = ":" + IOPRIO_CLASS.keys.join(', :')
+        msg = "Unsupported symbol :#{ioclass}, only support #{symbols}"
+        raise ArgumentError.new(msg)
+      end
+      ioclass = IOPRIO_CLASS[ioclass]
+    end
+
     case ioclass
     when IOPRIO_CLASS_NONE
-      raise ArgumentError.new("can't specify value with IOPRIO_CLASS_NONE") if value
+      raise ArgumentError.new("can't specify value with #{ioclass}") if value
       value = 0
     when IOPRIO_CLASS_RT, IOPRIO_CLASS_BE
       value = 4 if value.nil?
     when IOPRIO_CLASS_IDLE
-      raise ArgumentError.new("can't specify value with IOPRIO_CLASS_IDLE") if value
+      raise ArgumentError.new("can't specify value with #{ioclass}") if value
       value = 0
     else
-      value = 0
+      msg = "ioclass argument expected is an integer between 0 and 3, got #{ioclass}"
+      raise ArgumentError.new(msg)
     end
-    if value < 0 || value > 7
-      raise ArgumentError.new("value argument range expected is btween 0 and 7")
+    if value < 0 || value > 7 || value.to_i != value
+      msg = "value argument expected is an integer between 0 and 7, got #{value}"
+      raise ArgumentError.new(msg)
     end
     status = LibPosixPsutil.set_ionice(@pid, ioclass, value)
     raise SystemCallError.new('in set_ionice', status) if status != 0
@@ -351,8 +369,12 @@ class PlatformSpecificProcess < PsutilHelper::Processes
     IO.read("/proc/#{@pid}/stat").split[18].to_i
   end
 
-  def nice=
-    # TODO will be inplemented with C
+  def nice=(value)
+    if value.to_i != value || value < -20 || value > 19
+      raise ArgumentError.new("nice expected is an integer between -20 and 19, got #{value}")
+    end
+    status = LibPosixPsutil.set_priority(@pid, value)
+    raise SystemCallError.new("in set_priority", status) if status != 0
   end
 
   def num_ctx_switches
@@ -449,7 +471,31 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def rlimit(resource, limits=nil)
-    # TODO implement it with C
+    # if pid is 0 prlimit() applies to the calling process and
+    # we don't want that
+    if @pid == 0
+      raise ArgumentError.new("can't use prlimit() against PID 0 process")
+    end
+    if limits.nil?
+      # get
+      # On 64-bit system, long long is the same as long, can we replace it with long?
+      soft = FFI::MemoryPointer.new(:long_long, 1)
+      hard = FFI::MemoryPointer.new(:long_long, 1)
+      status = LibPosixPsutil.get_rlimit(@pid, resource, soft, hard)
+      raise SystemCallError.new("in get_rlimit", status) if status != 0
+      {:soft => soft.read_long_long, :hard => hard.read_long_long}
+    else
+      # set
+      if limits.is_a?(Hash) && limits.key?(:soft) && limits.key?(:hard)
+        status = LibPosixPsutil.set_rlimit(@pid, resource, 
+                                           limits[:soft], limits[:hard])
+        raise SystemCallError.new("in set_rlimit", status) if status != 0
+        limits
+      else
+        raise ArgumentError.new("second argument must be a {:soft, :hard} Hash")
+      end
+    end 
+
   end
 
   def status
@@ -474,8 +520,8 @@ class PlatformSpecificProcess < PsutilHelper::Processes
         st = IO.read("/proc/#{@pid}/task/#{id}/stat").strip
         st = st[/\) (.*$)/, 1]
         values = st.split(' ')
-        utime = values[11].to_f / COMMON::CLOCK_TICKS
-        stime = values[12].to_f / COMMON::CLOCK_TICKS
+        utime = values[11].to_f / CLOCK_TICKS
+        stime = values[12].to_f / CLOCK_TICKS
         retlist.push(OpenStruct.new(thread_id: id, 
                                     user_time: utime, system_time: stime))
       rescue Errno::ENOENT
