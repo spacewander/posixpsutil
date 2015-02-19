@@ -201,7 +201,9 @@ class TestLinuxProcess < MiniTest::Test
 
   def test_rlimit
     # Number of open files
-    rlimit = @process.rlimit(7)
+    rlimit = @process.rlimit(PosixPsutil::RLIMIT_NOFILE)
+    # or
+    #rlimit = @process.rlimit(:nofile)
     assert rlimit.key? :soft
     assert rlimit.key? :hard
 

@@ -3,14 +3,19 @@
 #endif
 #define _FILE_OFFSET_BITS 64
 
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 #include <sched.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/resource.h>
+#include <sys/statvfs.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <utmp.h>
 
 #include "./linux.h"
 
@@ -216,4 +221,54 @@ int set_rlimit(long pid, int resource, long long soft, long long hard)
         return errno;
     }
     return 0;
+}
+
+/*
+ * Return disk usage associated with path.
+ * @param frsize : fragment size
+ * @param blocks : size of fs in f_frsize units
+ * @param bavail : free blocks for unprivileged users
+ * @param bfree  : free blocks
+ */
+int disk_usage(const char *path, unsigned long *frsize, unsigned long *blocks,
+        unsigned long *bavail, unsigned long *bfree)
+{
+   struct statvfs buf;
+   if (statvfs(path, &buf) != 0) {
+       return errno;
+   }
+   *frsize = buf.f_frsize;
+   *blocks = buf.f_blocks;
+   *bavail = buf.f_bavail;
+   *bfree = buf.f_bfree;
+   return 0;
+}
+
+/*
+ * @return
+ *  -1 if getutent() return NULL
+ *  0 if getutent() return not NULL utmp
+ *  errno if something went wrong
+ */
+int get_user(char *username, char *tty, char *hostname, 
+        int *tstamp, short/* bool */ *user_proc)
+{
+    struct utmp *ut = getutent();
+    if (ut == NULL) {
+        if (errno == 0 || errno == ENOENT)
+            return -1;
+        else
+            return errno;
+    }
+    else {
+        strncpy(username, ut->ut_user, sizeof( ut->ut_user ) - 1);
+        strncpy(tty, ut->ut_line, sizeof( ut->ut_line ) - 1);
+        strncpy(hostname, ut->ut_host, sizeof( ut->ut_host ) - 1);
+        *tstamp = ut->ut_tv.tv_sec;
+        if (ut->ut_type == USER_PROCESS)
+            *user_proc = (short)1;
+        else
+            *user_proc = (short)0;
+        return 0;
+    }
 }

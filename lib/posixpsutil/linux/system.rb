@@ -1,5 +1,6 @@
 require 'ostruct'
 require 'date'
+require_relative '../common'
 require_relative 'libposixpsutil'
 require_relative 'helper'
 
@@ -235,9 +236,9 @@ class Memory
     IO.readlines('/proc/vmstat').each do |line|
       # values are expressed in 4 KB, we want bytes instead
       if line.start_with?('pswpin')
-        meminfo.sin = line.split(' ')[1].to_i * COMMON::PAGE_SIZE
+        meminfo.sin = line.split(' ')[1].to_i * LibPosixPsutil::PAGE_SIZE
       elsif line.start_with?('pswpout')
-        meminfo.sout = line.split(' ')[1].to_i * COMMON::PAGE_SIZE
+        meminfo.sout = line.split(' ')[1].to_i * LibPosixPsutil::PAGE_SIZE
       end
     end
 
@@ -272,24 +273,32 @@ class Disks
     ret
   end
 
+  # Return disk usage associated with path.
   # WARNING: this method show the usage of a +disk+ instead of a given path!
   def self.disk_usage(disk)
     usage = OpenStruct.new
-    # FIXME use df to get disk usage. Once the c binding is finished, replace it.
-    IO.popen('df') do |f|
-      f.readlines[1..-1].each do |fs|
-        _, total, used, free, percent, mountpoint = fs.split(' ')
-        # with 1K blocks
-        if mountpoint == disk
-          usage.total = total.to_i * 1024
-          usage.used = used.to_i * 1024
-          usage.free = free.to_i * 1024
-          usage.percent = percent
-        end
-      end
+    begin
+      frsize = FFI::MemoryPointer.new(:ulong, 1)
+      blocks = FFI::MemoryPointer.new(:ulong, 1)
+      bavail = FFI::MemoryPointer.new(:ulong, 1)
+      bfree = FFI::MemoryPointer.new(:ulong, 1)
+      status = LibPosixPsutil::disk_usage(disk, frsize, blocks, bavail, bfree)
+      raise SystemCallError.new("in disk_usage", status) if status != 0
+      frsize = frsize.read_ulong
+      blocks = blocks.read_ulong
+      bavail = bavail.read_ulong
+      bfree = bfree.read_ulong
+      usage.free = bavail * frsize
+      usage.total = blocks * frsize
+      usage.used = (blocks - bfree) * frsize
+      # NB: the percentage is -5% than what shown by df due to
+      # reserved blocks that we are currently not considering:
+      # http://goo.gl/sWGbH
+      usage.percent = COMMON::usage_percent(usage.used, usage.total, 1)
+    rescue Errno::ENOENT
+      msg = "Given Argument #{disk} is not a disk name"
+      throw ArgumentError.new(msg) if usage.total.nil?
     end
-
-    throw ArgumentError.new('Given Argument is not a disk name') if usage.total.nil?
     usage
   end
    
@@ -326,7 +335,8 @@ class Disks
         # go to http://www.mjmwired.net/kernel/Documentation/iostats.txt
         # and see what these fields mean
         if fields.length
-          _, _, name, reads, _, rbytes, rtime, writes, _, wbytes, wtime = fields[0..10]
+          _, _, name, reads, _, rbytes, rtime, writes, _, wbytes, wtime = 
+            fields[0..10]
         else
           # < kernel 2.6.25
           _, _, name, reads, rbytes, writes, wbytes = fields
@@ -443,20 +453,44 @@ class System
   
   # store boot time since it won't be changed
   @boot_at = nil
-  # use `who` to get userinfo. Also, replace it with system call if possible
+
+  # Return currently connected users as a list of 
+  # OpenStruct<#name, #tty, #host(hostname), #started(the time logined in)>.
+  # Unlike psutil, #started returned here is a DateTime instead of timestamp
   def self.users
     users = []
-    IO.popen('who') do |f|
-      f.readlines.each do |login_info|
-        name, tty, date, time, host = login_info.split(' ')
-        host = host[1..-2]
-        host = 'localhost' if host == ':0'
-        ts = DateTime.parse(date + " " + time).to_time.to_f
-        # I do not like to convert date and time to timestamp
-        # but this is what psutil does, so I have to follow it.
-        users.push(OpenStruct.new({name: name, terminal: tty, 
-                                   host: host, started: ts}))
+    begin
+      name = FFI::MemoryPointer.new(:char, 32)
+      tty = FFI::MemoryPointer.new(:char, 32)
+      host = FFI::MemoryPointer.new(:char, 256)
+      tstamp = FFI::MemoryPointer.new(:int, 1)
+      user_process = FFI::MemoryPointer.new(:short, 1)
+      LibPosixPsutil::setutent()
+      loop do
+        status = LibPosixPsutil::get_user(name, tty, host, 
+                                          tstamp, user_process)
+        case status
+        when -1
+          break
+        when 0
+          next if user_process.read_short == 0
+          # note: the underlying C function includes entries about
+          # system boot, run level and others.  We might want
+          # to use them in the future.
+          hostname =  host.read_string
+          hostname = 'localhost' if hostname == ':0' || hostname == ':0.0'
+          # keep the timestamp in epoch format, 
+          # let user define what they want, UTC or Local time
+          ts = tstamp.read_int
+          users.push(OpenStruct.new({
+            name: name.read_string, terminal: tty.read_string || nil,
+            host: hostname, started: ts}))
+        else
+          raise SystemCallError.new('in get_user', status)
+        end
       end
+    ensure
+      LibPosixPsutil::endutent()
     end
     users
   end

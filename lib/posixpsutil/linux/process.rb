@@ -33,6 +33,45 @@ IOPRIO_CLASS = {
   :idle => IOPRIO_CLASS_IDLE
 }
 
+# RLIMIT_ constants bits/resource.h
+RLIMIT_CPU = 0
+RLIMIT_FSIZE = 1
+RLIMIT_DATA = 2
+RLIMIT_STACK = 3
+RLIMIT_CORE = 4
+RLIMIT_RSS = 5
+RLIMIT_NPROC = 6
+RLIMIT_NOFILE = 7
+RLIMIT_MEMLOCK = 8
+RLIMIT_AS = 9
+RLIMIT_LOCKS = 10
+RLIMIT_SIGPENDING = 11
+RLIMIT_MSGQUEUE = 12
+RLIMIT_NICE = 13
+RLIMIT_RTPRIO = 14
+RLIMIT_RTTIME = 15
+RLIMIT_NLIMITS = 16
+
+RLIMIT = {
+  :cpu => RLIMIT_CPU,
+  :fsize => RLIMIT_FSIZE,
+  :data => RLIMIT_DATA,
+  :stack => RLIMIT_STACK,
+  :core => RLIMIT_CORE,
+  :rss => RLIMIT_RSS,
+  :nproc => RLIMIT_NPROC,
+  :nofile => RLIMIT_NOFILE,
+  :memlock => RLIMIT_MEMLOCK,
+  :as => RLIMIT_AS,
+  :locks => RLIMIT_LOCKS,
+  :sigpending => RLIMIT_SIGPENDING,
+  :msgqueue => RLIMIT_MSGQUEUE,
+  :nice => RLIMIT_NICE,
+  :rtprio => RLIMIT_RTPRIO,
+  :rttime => RLIMIT_RTTIME,
+  :nlimits => RLIMIT_NLIMITS
+}
+
 PAGE_SIZE = LibPosixPsutil::PAGE_SIZE
 CLOCK_TICKS = LibPosixPsutil::CLOCK_TICKS
 
@@ -471,6 +510,15 @@ class PlatformSpecificProcess < PsutilHelper::Processes
   end
 
   def rlimit(resource, limits=nil)
+    if resource.is_a?(Symbol)
+      unless RLIMIT.key? resource
+        symbols = ":" + RLIMIT.keys.join(', :')
+        msg = "Unsupported symbol :#{resource}, only support #{symbols}"
+        raise ArgumentError.new(msg)
+      end
+      resource = RLIMIT[resource]
+    end
+
     # if pid is 0 prlimit() applies to the calling process and
     # we don't want that
     if @pid == 0
@@ -492,7 +540,8 @@ class PlatformSpecificProcess < PsutilHelper::Processes
         raise SystemCallError.new("in set_rlimit", status) if status != 0
         limits
       else
-        raise ArgumentError.new("second argument must be a {:soft, :hard} Hash")
+        msg = "second argument must be a {:soft, :hard} Hash"
+        raise ArgumentError.new(msg)
       end
     end 
 

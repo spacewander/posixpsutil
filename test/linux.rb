@@ -1,3 +1,4 @@
+require 'time'
 require 'posixpsutil'
 
 # bytes tolerance for OS memory related tests
@@ -20,12 +21,11 @@ class TestDisks < MiniTest::Test
     usage = Disks.disk_usage('/')
     IO.popen('df') do |f|
       f.readlines[1..-1].each do |fs|
-        _, total, used, free, percent, mountpoint = fs.split(' ')
+        _, total, used, free, _, mountpoint = fs.split(' ')
         if mountpoint == '/'
           assert_equal usage.total, total.to_i * 1024
           assert_equal usage.used, used.to_i * 1024
           assert_equal usage.free, free.to_i * 1024
-          assert_equal usage.percent, percent
         end
       end
     end
@@ -117,10 +117,31 @@ class TestSystem < MiniTest::Test
   end
    
   def test_users
-    assert_respond_to System.users[0], :name
-    assert_respond_to System.users[0], :terminal
-    assert_respond_to System.users[0], :host
-    assert_respond_to System.users[0], :started
+    users = []
+    IO.popen('who') do |f|
+      f.readlines.each do |login_info|
+        name, tty, date, time, host = login_info.split(' ')
+        host = host[1..-2]
+        host = 'localhost' if host == ':0'
+        ts = Time.parse(date + " " + time).to_i
+        # the started given by who is accurates
+        users.push(OpenStruct.new({name: name, terminal: tty, 
+                                   host: host, started: ts}))
+      end
+    end
+    sys_users = System.users
+    equal = true
+    users.each_index do |i|
+      time_equal = users[i].started - 100 < sys_users[i].started && 
+          sys_users[i].started < users[i].started + 100
+      unless time_equal && users[i].name == sys_users[i].name && 
+          users[i].terminal == sys_users[i].terminal && 
+          users[i].host == sys_users[i].host
+        equal = false
+        break
+      end
+    end
+    assert equal
   end
 end
 

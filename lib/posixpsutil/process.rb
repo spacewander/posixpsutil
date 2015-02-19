@@ -465,7 +465,21 @@ class Process
     # You can use symbols or CONSTANTS as resource argument.
     # RLIMIT_CPU :cpu => 0
     # RLIMIT_FSIZE :fsize => 1
-    # RLIMIT_
+    # RLIMIT_DATA :data => 2
+    # RLIMIT_STACK :stack => 3
+    # RLIMIT_CORE :core => 4
+    # RLIMIT_RSS :rss => 5
+    # RLIMIT_NPROC :nproc => 6
+    # RLIMIT_NOFILE :nofile => 7
+    # RLIMIT_MEMLOCK :memlock => 8
+    # RLIMIT_AS :as => 9
+    # RLIMIT_LOCKS :locks => 10
+    # RLIMIT_SIGPENDING :sigpending => 11
+    # RLIMIT_MSGQUEUE :msgqueue => 12
+    # RLIMIT_NICE :nice => 13
+    # RLIMIT_RTPRIO :rtprio => 14
+    # RLIMIT_RTTIME :rttime => 15
+    # RLIMIT_NLIMITS :nlimits => 16
     def rlimit(resource, limits=nil)
         @proc.rlimit
     end

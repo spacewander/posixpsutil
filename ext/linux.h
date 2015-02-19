@@ -8,4 +8,8 @@ int set_ionice(long pid, int ioclass, int iodata);
 int get_rlimit(long pid, int resource, long long *soft, long long *hard);
 int set_rlimit(long pid, int resource, long long soft, long long hard);
 
+int disk_usage(const char *path, unsigned long *frsize, unsigned long *blocks, 
+        unsigned long *bavail, unsigned long *bfree);
+int get_user(char *username, char *tty, char *hostname, 
+        int *tstamp, short/* bool */ *user_proc);
 #endif /* LINUX_H */
