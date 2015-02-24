@@ -6,6 +6,8 @@ class PsutilError < StandardError
   end
 end
 
+# Raise it if the process behind doesn't exist 
+# when you try to call a method of a Process instance.
 class NoSuchProcess < PsutilError
   # should be used at least like NoSuchProcess.new(pid: xxx) 
   def initialize(opt={})
@@ -25,6 +27,7 @@ class NoSuchProcess < PsutilError
 
 end
 
+# Raise it when the access is denied, a wrapper of ENOENT::EACCES
 class AccessDenied < PsutilError
   
   def initialize(opt={})

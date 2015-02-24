@@ -61,7 +61,7 @@ class Process
 
   # class methods
 
-  # Return a list of current running PIDs.
+  # Return an Array of current running PIDs.
   def self.pids
     PlatformSpecificProcess.pids()
   end
@@ -130,6 +130,9 @@ class Process
   end
   
   # instance methods
+
+  # initialize a Process instance with pid, 
+  # if not pid given, initialize it with current process's pid.
   def initialize(pid=nil)
     pid = ::Process.pid unless pid
     @pid = pid
@@ -160,6 +163,7 @@ class Process
     @identity = [@pid, @create_time]
   end
 
+  # Return description of Process instance.
   def to_s
     begin
       return "(pid=#{@pid}, name=#{name()})"
@@ -170,13 +174,14 @@ class Process
     end
   end
 
+  # Return a printable version of Process instance's description.
   def inspect
     self.to_s.inspect
   end
 
+  # Test for equality with another Process object based
+  # on PID and creation time.
   def ==(other)
-    # Test for equality with another Process object based
-    # on PID and creation time.
     return self.class == other.class && @identity == other.identity
   end
   alias_method :eql?, :==
@@ -266,7 +271,8 @@ class Process
   end
 
   # actual API
-  
+
+  # Return the parent pid of the process.
   def ppid
     @proc.ppid
   end
@@ -401,6 +407,8 @@ class Process
     @proc.num_fds
   end
 
+  # Waiting until process does not existed any more. 
+  # Raise Timeout::Error if time out while waiting.
   def wait(timeout = nil)
     if timeout && timeout < 0
       raise ArgumentError.new("timeout must be a positive integer") 
@@ -435,10 +443,13 @@ class Process
     # `man ionice` for further info
     # 
     # You can use symbols or CONSTANTS as ioclass argument.
-    # IOPRIO_CLASS_NONE :none => 0
-    # IOPRIO_CLASS_RT :rt => 1
-    # IOPRIO_CLASS_BE :be => 2
-    # IOPRIO_CLASS_IDLE :idle => 3
+    # For example, `p.ioclass(:be, 4)` or 
+    # `p.ioclass(PosixPsutil::IOPRIO_CLASS_BE, 4)`
+    # 
+    # * IOPRIO_CLASS_NONE :none => 0
+    # * IOPRIO_CLASS_RT :rt => 1
+    # * IOPRIO_CLASS_BE :be => 2
+    # * IOPRIO_CLASS_IDLE :idle => 3
     def ionice(ioclass=nil, value=nil)
       if ioclass.nil? 
         raise ArgumentError.new("'ioclass' must be specified") if value
@@ -463,23 +474,30 @@ class Process
     # And see bits/resource.h for the detail about resource.
     # 
     # You can use symbols or CONSTANTS as resource argument.
-    # RLIMIT_CPU :cpu => 0
-    # RLIMIT_FSIZE :fsize => 1
-    # RLIMIT_DATA :data => 2
-    # RLIMIT_STACK :stack => 3
-    # RLIMIT_CORE :core => 4
-    # RLIMIT_RSS :rss => 5
-    # RLIMIT_NPROC :nproc => 6
-    # RLIMIT_NOFILE :nofile => 7
-    # RLIMIT_MEMLOCK :memlock => 8
-    # RLIMIT_AS :as => 9
-    # RLIMIT_LOCKS :locks => 10
-    # RLIMIT_SIGPENDING :sigpending => 11
-    # RLIMIT_MSGQUEUE :msgqueue => 12
-    # RLIMIT_NICE :nice => 13
-    # RLIMIT_RTPRIO :rtprio => 14
-    # RLIMIT_RTTIME :rttime => 15
-    # RLIMIT_NLIMITS :nlimits => 16
+    # For example:
+    # 
+    #   limits = {:soft => 1024, :hard => 4096}
+    #   p.rlimit(PosixPsutil::RLIMIT_NOFILE, limits)
+    #   # or
+    #   p.rlimit(:nofile, limits)
+    #
+    # * RLIMIT_CPU :cpu => 0
+    # * RLIMIT_FSIZE :fsize => 1
+    # * RLIMIT_DATA :data => 2
+    # * RLIMIT_STACK :stack => 3
+    # * RLIMIT_CORE :core => 4
+    # * RLIMIT_RSS :rss => 5
+    # * RLIMIT_NPROC :nproc => 6
+    # * RLIMIT_NOFILE :nofile => 7
+    # * RLIMIT_MEMLOCK :memlock => 8
+    # * RLIMIT_AS :as => 9
+    # * RLIMIT_LOCKS :locks => 10
+    # * RLIMIT_SIGPENDING :sigpending => 11
+    # * RLIMIT_MSGQUEUE :msgqueue => 12
+    # * RLIMIT_NICE :nice => 13
+    # * RLIMIT_RTPRIO :rtprio => 14
+    # * RLIMIT_RTTIME :rttime => 15
+    # * RLIMIT_NLIMITS :nlimits => 16
     def rlimit(resource, limits=nil)
         @proc.rlimit
     end
@@ -526,23 +544,25 @@ class Process
   # Return the children of this process as a list of Process
   # instances, pre-emptively checking whether PID has been reused.
   # If recursive is true return all the parent descendants.
-
+  #
   # Example (A == this process):
-
-  # A ─┐
-  #    │
-  #    ├─ B (child) ─┐
-  #    │             └─ X (grandchild) ─┐
-  #    │                                └─ Y (great grandchild)
-  #    ├─ C (child)
-  #    └─ D (child)
-
-  # require 'posixpsutil'
-  # p = Process.new()
-  # p.children()
-  # # B, C, D
-  # p.children(true)
-  # # B, X, Y, C, D
+  #
+  #   A ─┐
+  #      │
+  #      ├─ B (child) ─┐
+  #      │             └─ X (grandchild) ─┐
+  #      │                                └─ Y (great grandchild)
+  #      ├─ C (child)
+  #      └─ D (child)
+  #
+  #   require 'posixpsutil'
+  #
+  #   p = PosixPsutil::Process.new(Process.pid)
+  #   p.children()
+  #   # B, C, D
+  #   p.children(true)
+  #   # B, X, Y, C, D
+  #
   def children(recursive = false)
     ret = []
     if recursive
@@ -612,7 +632,7 @@ class Process
   #
   #   require 'posixpsutil'
   #
-  #   p = Process.new(Process.pid)
+  #   p = PosixPsutil::Process.new(Process.pid)
   #   # blocking
   #   p.cpu_percent(1)
   #   # 2.0
@@ -621,7 +641,7 @@ class Process
   #   p.cpu_percent
   #   # 2.9
   #   
-  #   p = Process.new(4527)
+  #   p = PosixPsutil::Process.new(4527)
   #   # first called
   #   p.cpu_percent
   #   # 0.0

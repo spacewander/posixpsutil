@@ -7,6 +7,10 @@ require_relative 'helper'
 module PosixPsutil
 class CPU
 
+  # Return OpenStruct representing the CPU times for all CPU available in the system. 
+  # If precpu is true, return an Array of that OpenStructs, one per CPU.
+  # 
+  # For the format of OpenStruct, see `get_cpu_fields`.
   def self.cpu_times(precpu=false)
     proc_stat = File.new('/proc/stat')
     cpu = proc_stat.readline()
@@ -74,6 +78,7 @@ class CPU
 
   @logical_cpu_count = nil
   @physical_cpu_count = nil
+  # Return the number of physical/logical CPUs in the system.
   def self.cpu_count(logical=true)
     count = 0
     if !logical
@@ -97,23 +102,25 @@ class CPU
   end
 
   # The  amount  of  time,  measured in units of +USER_HZ+
-  # (1/100ths of a second on most architectures, use sysconf(_SC_CLK_TCK) to obtain the right value), 
+  # (1/100ths of a second on most architectures, 
+  # use sysconf(_SC_CLK_TCK) to obtain the right value), 
   # that the system spent in various states
-  # user   (1) Time spent in user mode.
-  # nice   (2) Time spent in user mode with low priority (nice).
-  # system (3) Time spent in system mode.
-  # idle   (4) Time spent in the idle task.  This value should be USER_HZ times the second entry in the /proc/uptime pseudo-file.
-  # iowait (since Linux 2.5.41)
+  #
+  # * user   (1) Time spent in user mode.
+  # * nice   (2) Time spent in user mode with low priority (nice).
+  # * system (3) Time spent in system mode.
+  # * idle   (4) Time spent in the idle task. This value should be USER_HZ times the second entry in the /proc/uptime pseudo-file.
+  # * iowait (since Linux 2.5.41)
   #        (5) Time waiting for I/O to complete.
-  # irq (since Linux 2.6.0-test4)
+  # * irq (since Linux 2.6.0-test4)
   #        (6) Time servicing interrupts.
-  # softirq (since Linux 2.6.0-test4)
+  # * softirq (since Linux 2.6.0-test4)
   #        (7) Time servicing softirqs.
-  # steal (since Linux 2.6.11)
+  # * steal (since Linux 2.6.11)
   #        (8) Stolen time, which is the time spent in other operating systems when running in a virtualized environment
-  # guest (since Linux 2.6.24)
+  # * guest (since Linux 2.6.24)
   #        (9) Time spent running a virtual CPU for guest operating systems under the control of the Linux kernel.
-  # guest_nice (since Linux 2.6.33)
+  # * guest_nice (since Linux 2.6.33)
   #        (10) Time spent running a niced guest (virtual CPU for guest operating systems under the control of the Linux kernel).
   def self.get_cpu_fields(line)
     stat = line.split(" ")
@@ -249,6 +256,8 @@ end
 
 class Disks
 
+  # Return mounted disk partitions as an Array of 
+  # <OpenStruct device, mountpoint, fstype, opts>
   def self.disk_partitions()
     phydevs = []
     # get physical filesystems
@@ -273,7 +282,8 @@ class Disks
     ret
   end
 
-  # Return disk usage associated with path.
+  # Return disk usage associated with path, 
+  # representing in <OpenStruct free, total, used, percent>.
   # WARNING: this method show the usage of a +disk+ instead of a given path!
   def self.disk_usage(disk)
     usage = OpenStruct.new
@@ -302,6 +312,9 @@ class Disks
     usage
   end
    
+  # Return disk I/O statistics for every disk installed on the
+  # system as an Array of 
+  # <OpenStruct read_count, write_count, read_bytes, write_bytes, read_time, write_time>
   def self.disk_io_counters(perdisk=true)
     # get disks list
     partitions = []
@@ -381,10 +394,14 @@ class Network
   include PsutilHelper
   include NetworkConstance
 
-  # get counters of network io (per network interface)
+  # Get counters of network io (per network interface)
   #
-  # when pernic is true, return a hash contains network io of each interface,
-  # otherwise return sum of all interface
+  # When pernic is true, return a hash contains network io of each interface,
+  # otherwise return sum of all interfaces.
+  #
+  # The network io of each/all interface(s) is represented in
+  # #<OpenStruct bytes_recv, packets_recv, errin, dropin, bytes_sent, 
+  # packets_sent, errout, dropout>.
   def self.net_io_counters(pernic=false)
     lines = IO.readlines('/proc/net/dev')[2..-1]
     if pernic
