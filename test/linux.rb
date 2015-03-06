@@ -14,6 +14,7 @@ class TestCPU < MiniTest::Test
   CPU.cpu_percent(1.0)
   CPU.cpu_percent(1.0, true)
   CPU.cpu_times_percent(1.0, true)
+  CPU.cpu_times_percent(1.0, false)
 end
 
 class TestDisks < MiniTest::Test

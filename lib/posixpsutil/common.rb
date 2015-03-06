@@ -12,7 +12,7 @@ NON_OSX_PLATFORM = /linux|solaris|bsd|aix/i
 
 # The name of dynamic library where we put platform specific C extention into.
 # If you want to change the name, please change ext/*/Makefile too.
-EXT=File.expand_path('ext', '.')
+EXT=File.expand_path('../../../ext', __FILE__)
 LibLinuxName = File.join(EXT, 'linux', 'libposixpsutil.so')
 LibPosixName = File.join(EXT, 'posix', 'libposixpsutil.so')
 LibOSXName = File.join(EXT, 'posix', 'libposixpsutil.dylib')
@@ -125,7 +125,7 @@ def wait_pid(pid, timeout=nil)
 
   def check_timeout(delay, stop_at, timeout)
     if timeout
-      raise Timeout::Error if Time.now >= stop_at
+      raise Timeout::Error.new("when waiting for (pid=#{pid})") if Time.now >= stop_at
     end
     sleep(delay)
     delay * 2 < 0.04 ? delay * 2 : 0.04

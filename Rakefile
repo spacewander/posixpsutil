@@ -1,19 +1,11 @@
 #!/usr/bin/env rake
 # encoding: UTF-8
 
-begin
-  require 'bundler/setup'
-rescue LoadError
-  puts 'You must `gem install bundler` and `bundle install` to run rake tasks'
-end
-
-Bundler::GemHelper.install_tasks
-
 require 'rake'
 require 'rake/clean'
 require 'rake/testtask'
-require 'rbconfig'
-include RbConfig
+
+require_relative 'make'
 
 CLEAN.include(
   '**/*.core',              # Core dump files
@@ -31,29 +23,9 @@ task :example => [:build] do
   end
 end
 
-def make_srcs(task=nil)
-  if !ENV['platform'].nil?
-    params = "platform='#{ENV['platform']}'"
-  elsif CONFIG['host_os'] =~ /linux/i
-    params = "platform='linux'"
-  else
-    params = "platform='posix'"
-  end
-
-  params = "install " + params if task == :install
-  Dir.chdir 'ext' do
-    sh "make #{params}"
-  end
-end
-
 desc "build C extention"
 task :build do
   make_srcs
-end
-
-task :install => [:clean] do
-  make_srcs :install
-  #TODO Don't really install it now
 end
 
 Rake::TestTask.new do |t|

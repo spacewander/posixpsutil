@@ -33,7 +33,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(OBJS) $(LDLIBS) -o $(TARGET)
 
 %.o : %.c
-	$(CC) -fPIC -c $(CCFLAGS) $< -o $@
+	$(CC) -fPIC -O2 -c $(CCFLAGS) $< -o $@
 
 -include $(DEPS)
 

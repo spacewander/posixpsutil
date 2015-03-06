@@ -72,7 +72,7 @@ class CPU
       ret
     else
       @last_cpu_times = self.cpu_times()
-      calculate_cpu_percent_field(total_start, @last_cpu_times_fields)
+      calculate_cpu_percent_field(total_start, @last_cpu_times)
     end
   end
 

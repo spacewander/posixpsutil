@@ -499,7 +499,7 @@ class Process
     # * RLIMIT_RTTIME :rttime => 15
     # * RLIMIT_NLIMITS :nlimits => 16
     def rlimit(resource, limits=nil)
-        @proc.rlimit
+        @proc.rlimit(resource, limits)
     end
   end
 
@@ -518,8 +518,9 @@ class Process
         @proc.cpu_affinity
       elsif cpus.is_a?(Array)
         @proc.cpu_affinity=(cpus)
+      else
+        raise ArgumentError.new("cpus must be an Array, got #{cpus}")
       end
-      raise ArgumentError.new("cpus must be an Array, got #{cpus}")
     end
   end
 

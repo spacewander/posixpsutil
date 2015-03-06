@@ -1,0 +1,6 @@
+require_relative '../make'
+
+desc 'Make C extensions before install'
+task :default do
+  make_srcs :install, '.'
+end

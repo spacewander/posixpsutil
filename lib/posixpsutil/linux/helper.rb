@@ -111,12 +111,8 @@ module PsutilHelper
         line = line.split(' ')
         inode = line[9].to_i
         if inodes.key?(inode)
-          # We assume inet sockets are unique, so we error
-          # out if there are multiple references to the
-          # same inode. We won't do this for UNIX sockets.
-          if inodes[inode].size > 1
-            raise ArgumentError.new("ambiguos inode with multiple PIDs references")
-          end
+          # We assume inet sockets are unique, 
+          # but actually there are some sockets share the same inode
           pid, fd = inodes[inode][0]
         else
           #  set pid to nil and fd to -1 for those inodes without relative pid/fd. 

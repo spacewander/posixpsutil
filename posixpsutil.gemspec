@@ -10,10 +10,13 @@ Gem::Specification.new do |s|
   s.authors     = ["spacewander"]
   s.email       = ["spacewanderlzx@gmail.com"]
   s.homepage    = 'https://github.com/spacewander/posixpsutil'
-  s.summary     = 'A posix process and system utilities module for Ruby'
-  s.description = 'posixpsutil is a ruby gem which shows process and system information for you'
-  s.files       = Dir["lib/**/*"] + Dir["ext/**/*"] + ["README.md", "Rakefile"]
+  s.summary     = 'A posix processes and system utilities monitor in Ruby'
+  s.platform    = Gem::Platform.local
+  s.description = 'posixpsutil is a ruby gem which shows processes and system information for you'
+  s.files       = Dir["lib/**/*"] + Dir["ext/**/*"] + ["README.md", "Rakefile", "make.rb"]
   s.test_files  = Dir["test/*"]
+  s.extensions  << 'ext/Rakefile'
   s.license     = 'new BSD'
-  s.add_dependency 'ffi'
+  s.required_ruby_version = '>= 1.9'
+  s.add_dependency 'ffi', '~> 1.9'
 end
